@@ -153,6 +153,11 @@ function Import-Env {
 	- Force: Variables are always expanded
 	- Ignore: Variables are never expanded
 
+	.PARAMETER MergeEnvironmentVariables
+	MergeEnvironmentVariables determines if the current processs environment variables are merged with the imported variables
+	If set all imported variables are added to the current process environment variables, existing variables are overwritten
+	If not set only imported variables are returned
+
 	.INPUTS
 	The string[] of file names to import, same as the file_name parameter
 	If Raw is set, the string content of the file(s) to import
@@ -224,13 +229,26 @@ function Import-Env {
 		[Parameter(Mandatory = $false)]
 		[switch] $Raw,
 		[Parameter(Mandatory = $false)]
-		[ImportEnvExpand] $Expand = [ImportEnvExpand]::Default
+		[ImportEnvExpand] $Expand = [ImportEnvExpand]::Default,
+		[Parameter(Mandatory = $false)]
+		[switch] $MergeEnvironmentVariables
 	)
 
 	begin {
 		$variables = [System.Collections.Generic.Dictionary[string, string]]::new()
 		[int] $success_count = 0
 		[string[]] $failures = @()
+
+		if ($MergeEnvironmentVariables) {
+			# GetEnvironmentVariables returns a IDictionary, not a IDictionary[string, string]
+			# The key and value are [string]s
+			# Validate keys and values, and convert to Dictionary[string, string]
+			foreach ($key_value_pair in [System.Environment]::GetEnvironmentVariables([System.EnvironmentVariableTarget]::Process).GetEnumerator()) {
+				if ($key_value_pair.Key) {
+					$variables[$key_value_pair.Key] = if ($key_value_pair.Value) { $key_value_pair.Value } else { $null }
+				}
+			}
+		}
 		##
 		# Helper functions
 		##
