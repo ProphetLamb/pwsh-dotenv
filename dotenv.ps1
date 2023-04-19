@@ -499,7 +499,7 @@ function Import-Env {
 			}
 
 			if ($failure_count -gt 0) {
-				throw "Invalid .env file format: $($match_collection.Count - $failure_count) lines loaded, $failure_count lines failed. See above for details."
+				Write-Error "Invalid .env file format: $($match_collection.Count - $failure_count) lines loaded, $failure_count lines failed. See above for details."
 			}
 		}
 	}
@@ -555,7 +555,7 @@ function Import-Env {
 
 		Write-Host "Import-Env : Sucessfully loaded $success_count files" -ForegroundColor Green
 		if ($failure_count -gt 0) {
-			throw "Failed to load $failure_count out of $total_count files: $failures"
+			Write-Error "Failed to load $failure_count out of $total_count files: $failures"
 		}
 	}
 }
