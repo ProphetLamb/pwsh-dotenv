@@ -1,7 +1,15 @@
-###############################################################################
-# Self installation
-###############################################################################
-# Self installation Source https://github.com/jpassing/powershell-install-as-module/blob/master/Install-Template.ps1 licensed under APACHE 2.0
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+This script is used to load dotenv as a module in the current session or permanently
+.DESCRIPTION
+Using the options Install and Uninstall, allows the user to install and uninstall dotenv as a powershell module to either the current user or local machine
+Elevated privileges are required to install to the local machine
+.PARAMETER Install
+Install the module to the current user or local machine
+.PARAMETER Uninstall
+Uninstall the module from the current user or local machine
+#>
 [CmdletBinding()]
 Param(
 	[Parameter(Mandatory = $false)][ValidateSet("LocalMachine", "CurrentUser")][string] $Install,
@@ -11,6 +19,8 @@ Param(
 ###############################################################################
 ###= dotenv\dotenv.psd1
 ###############################################################################
+# Copyright (c) 2023, ProphetLamb
+# Dotenv for Powershell https://github.com/ProphetLamb/pwsh-dotenv/ dual licensed under the MIT & APACHE 2.0 License at your option
 
 @{
 	ModuleVersion     = '0.1.0'
@@ -26,6 +36,8 @@ Param(
 ###############################################################################
 ###=
 ###############################################################################
+# Copyright (c) 2019, Johannes Passing
+# Self installation https://github.com/jpassing/powershell-install-as-module/ licensed under the APACHE 2.0 License
 
 function Install-ScriptAsModule {
 	<#
@@ -108,7 +120,8 @@ else {
 ###############################################################################
 ###= dotenv\dotenv.psm1
 ###############################################################################
-
+# Copyright (c) 2023, ProphetLamb
+# Dotenv for Powershell https://github.com/ProphetLamb/pwsh-dotenv/ dual licensed under the MIT & APACHE 2.0 License at your option
 #Requires -version 4
 
 Set-StrictMode -Version Latest
@@ -236,15 +249,15 @@ function Import-Env {
   #>
 	[OutputType([System.Collections.Generic.Dictionary[string, string]])]
 	param (
-		[Parameter(Mandatory = $false, Position = 0, ValueFromPipeline = $true)]
+		[Parameter(Mandatory = $false, Position = 0, ValueFromPipeline = $true)][Alias('f')]
 		[string[]] $File,
-		[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)][Alias('c')]
 		$Encoding = 'utf8',
-		[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)][Alias('r')]
 		[switch] $Raw,
-		[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)][Alias('e')]
 		[ImportEnvExpand] $Expand = [ImportEnvExpand]::Default,
-		[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)][Alias('m')]
 		[switch] $MergeEnvironmentVariables
 	)
 
@@ -653,9 +666,9 @@ function Export-Env {
 	#>
 	[OutputType([string[]])]
 	param(
-		[Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
+		[Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)][Alias('v')]
 		[System.Collections.Generic.Dictionary[string, string]] $Variables,
-		[Parameter(Mandatory = $false)]
+		[Parameter(Mandatory = $false)][Alias('t')]
 		[ExportEnvTarget] $Target = [ExportEnvTarget]::Process
 	)
 	begin {
@@ -778,9 +791,9 @@ function Use-Env {
 	>
 	#>
 	param(
-		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
+		[Parameter(Mandatory = $false, ValueFromPipeline = $true)][Alias('v')]
 		[System.Collections.Generic.Dictionary[string, string]] $Variables,
-		[Parameter(Mandatory = $true, Position = 0)]
+		[Parameter(Mandatory = $true, Position = 0)][Alias('c')]
 		$Command
 	)
 
@@ -835,15 +848,62 @@ function dotenv {
 	.EXAMPLE
 
 	.NOTES
+	Besides the formatting differences to dotenv-cli, the following differences exist:
+	- The precedence of environment variables is as follows: System > .env > .env.local > .env.[configuration] > -v Variable
+	- The -c parameter requires a value. pass the empty string for the local configuration only
 	#>
 	param(
 		[Parameter(Mandatory = $true)][Alias('e')]
 		[string[]] $EnvFiles,
 		[Parameter(Mandatory = $false)][Alias('c')]
-		[string] $Configuration,
+		[AllowNull()] $Configuration = $null,
 		[Parameter(Mandatory = $false)][Alias('v')]
 		[string[]] $Variables,
+		[Parameter(Mandatory = $false)][Alias('p')]
+		[string[]] $Probes,
 		[Parameter(Mandatory = $false, Position = 0)]
 		[string] $Command
 	)
+
+	function _merge_var([System.Collections.Generic.Dictionary[string, string]] $lhs, [string] $key, [string] $value) {
+		if ($key) {
+			$lhs[$key] = if ($value) { $value } else { $null }
+		}
+	}
+
+	function _add_configuration($env_files, $config) {
+		# reverse loop to ensure that the last configuration is the first in the list
+		for ($i = $env_files.Count - 1; $i -ge 0; $i--) {
+			$env_files += "$($env_files[$i]).$config"
+		}
+		$env_files
+	}
+
+	# append configuration specific env files
+	if ($null -ne $Configuration) {
+		if ($Configuration -ne '') {
+			$EnvFiles = _add_configuration $EnvFiles $Configuration
+		}
+		$EnvFiles = _add_configuration $EnvFiles 'local'
+	}
+	# load the process environment
+	[System.Collections.Generic.Dictionary[string, string]] $vars = Import-Env -MergeEnvironmentVariables
+	# load the env files
+	($EnvFiles | Import-Env).GetEnumerator() | ForEach-Object {
+		_merge_var $vars $_.Key $_.Value }
+	# load the custom variables
+	($Variables | Import-Env).GetEnumerator() | ForEach-Object {
+		 _merge_var $vars $_.Key $_.Value }
+	if ($Probes) {
+		# export the probe variables
+		foreach ($probe in $Probes.GetEnumerator()) {
+			if ($vars.ContainsKey($probe)) {
+				Write-Output $vars[$probe]
+			}
+		}
+	}
+	if ($Command) {
+		# execute the command
+		$vars | Use-Env $Command
+	}
 }
