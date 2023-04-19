@@ -1,3 +1,4 @@
 {
-  "pester.autoRunOnSave": false
+  "pester.autoRunOnSave": false,
+  "ltex.language": "en-GB",
 }
