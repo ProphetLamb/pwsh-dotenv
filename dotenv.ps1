@@ -853,8 +853,9 @@ function dotenv {
 	.EXAMPLE
 
 	.NOTES
-	Besides the formatting differences to dotenv-cli, the following differences exist:
+	Besides the shell induced differences to dotenv-cli, the following differences exist:
 	- The precedence of environment variables is as follows: System > .env > .env.local > .env.[configuration] > -v Variable
+	- The -o parameter is thus not supported
 	- The -c parameter requires a value. pass the empty string for the local configuration only
 	#>
 	param(
