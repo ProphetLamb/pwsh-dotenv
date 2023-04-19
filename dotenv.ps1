@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-This script is used to load dotenv as a module in the current session or permanently
+This script is used to install dotenv as a module in the current session or permanently
 .DESCRIPTION
 Using the options Install and Uninstall, allows the user to install and uninstall dotenv as a powershell module to either the current user or local machine
 Elevated privileges are required to install to the local machine
@@ -9,6 +9,15 @@ Elevated privileges are required to install to the local machine
 Install the module to the current user or local machine
 .PARAMETER Uninstall
 Uninstall the module from the current user or local machine
+.EXAMPLE
+. ./dotenv.ps1
+Load dotenv for the current session
+.EXAMPLE
+. ./dotenv.ps1 -Install CurrentUser
+Install dotenv to user profile
+.EXAMPLE
+. ./dotenv.ps1 -Install LocalMachine
+Install dotenv to maschine
 #>
 [CmdletBinding()]
 Param(
@@ -136,10 +145,9 @@ enum ImportEnvExpand {
 function Import-Env {
 	<#
 	.SYNOPSIS
-	Import environment variables from a .env file
+	Import environment variables from a .env file into memory
 
 	.DESCRIPTION
-	Import environment variables from a .env file.
 	The .env file should be a list of lines in the format of KEY=VALUE
 	Variables denoted by $ are interpreted as environment variables. This occurs recursively
 	Comments are denoted by # and are ignored.
@@ -246,8 +254,7 @@ function Import-Env {
 	HkVN9...
 	...
 	-----END DSA PRIVATE KEY-----
-
-	'''                   # Tailing line breaks are removed
+	'''                   # One leading and tailing line break is removed
 	=HIDDEN=DISSALLOWED   # This is ignored
 	AnotherVariable=Hello # This is a comment
   #>
@@ -621,7 +628,7 @@ enum ExportEnvTarget {
 function Export-Env {
 	<#
 	.SYNOPSIS
-	Exports the key-value pairs to environment variables
+	Export the key-value pairs from memory to the specified target
 
 	.DESCRIPTION
 	The key-value pairs are exported to the specified target. For environment variables that can be the scopes process, user, or machine.
@@ -767,7 +774,6 @@ function Use-Env {
 	Executes a command with the specified environment variables
 
 	.DESCRIPTION
-	Executes a command with the specified environment variables
 	Ensures that the current environment variables are restored after the command is executed, even if the command fails
 
 	.PARAMETER Variables
@@ -835,7 +841,7 @@ function Use-Env {
 function dotenv {
 	<#
 	.SYNOPSIS
-	dotenv-cli like tool for PowerShell
+	dotenv-cli like tool
 
 	.DESCRIPTION
 	Internally uses the functions Import-Env, Export-Env, Use-Env to provide an interface simmilar to dotenv-cli
@@ -862,7 +868,7 @@ function dotenv {
 	- The -c parameter requires a value. pass the empty string for the local configuration only
 	#>
 	param(
-		[Parameter(Mandatory = $true)][Alias('e')]
+		[Parameter(Mandatory = $false)][Alias('e')]
 		[string[]] $EnvFiles,
 		[Parameter(Mandatory = $false)][Alias('c')]
 		[AllowNull()] $Configuration = $null,
@@ -883,14 +889,17 @@ function dotenv {
 	function _add_configuration($env_files, $config) {
 		# reverse loop to ensure that the last configuration is the first in the list
 		for ($i = $env_files.Count - 1; $i -ge 0; $i--) {
-			$env_files += "$($env_files[$i]).$config"
+			$env_file = "$($env_files[$i]).$config"
+			if (Test-Path $env_file) {
+				$env_files += $env_file
+			}
 		}
 		$env_files
 	}
 
 	# if no env files are specified, use the default .env
-	if ($EnvFiles.Count -eq 0) {
-		$EnvFiles += '.env'
+	if (-not $EnvFiles) {
+		$EnvFiles = if (Test-Path '.env') { @('.env') } else { @() }
 	}
 	# append configuration specific env files
 	if ($null -ne $Configuration) {
@@ -905,7 +914,7 @@ function dotenv {
 	# load the env files
 	($EnvFiles | Import-Env).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
 	# load the custom variables
-	($Variables | Import-Env).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
+	($Variables | Import-Env -Raw).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
 
 	if ($Probes) {
 		# export the probe variables
