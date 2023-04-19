@@ -83,3 +83,30 @@ Describe 'Use-Env' {
     $env:DoubleQuoteMultiline | Should -BeNullOrEmpty
   }
 }
+
+Describe 'dotenv' {
+  It 'should allow probing values' {
+    [string[]]$query = dotenv -e .env -p DoubleQuoteMultiline, DoubleQuote
+    $query.Count | Should -Be 2
+    $query[0] | Should -Not -BeNullOrEmpty
+    $query[1] | Should -Be "Line`"`nStringValue"
+  }
+
+  It 'should not return when probing non existing values' {
+    dotenv -e .env -p DoesNotExist | Should -BeNullOrEmpty
+  }
+
+  It 'should execute commands' {
+    $test = dotenv -e .env 'echo $env:DoubleQuote'
+    $test | Should -Not -BeNullOrEmpty
+    $test | Should -Be "Line`"`nStringValue"
+  }
+
+  It 'should override .env values with .env.local configuration' {
+    $test = dotenv -e .env 'echo $env:Hello'
+    $test | Should -BeNullOrEmpty
+    $test = dotenv -e .env -c '' 'echo $env:Hello'
+    $test | Should -Not -BeNullOrEmpty
+    $test | Should -Be "World"
+  }
+}
