@@ -57,6 +57,7 @@ function Install-ScriptAsModule {
 			$OutputFile = $_.Substring($Prefix.Length).Trim()
 
 			if ($OutputFile) {
+				Write-Debug "Installing '$OutputFile'"
 				$FullOutputPath = (Join-Path -Path $ModulePath -ChildPath $OutputFile)
 
 				New-Item `
@@ -72,6 +73,7 @@ function Install-ScriptAsModule {
 			$_ | Out-File  $FullOutputPath -Append
 		}
 	}
+	Write-Debug "Installation to '$ModulePath' complete"
 }
 
 function Uninstall-ScriptAsModule {
@@ -88,6 +90,7 @@ function Uninstall-ScriptAsModule {
 		$OutputFile = $_.Substring($Prefix.Length).Trim()
 
 		if ($OutputFile) {
+			Write-Debug "Uninstalling '$OutputFile'"
 			$FullOutputPath = (Join-Path -Path $ModulePath -ChildPath $OutputFile)
 
 			if (Test-Path $FullOutputPath) {
@@ -95,6 +98,7 @@ function Uninstall-ScriptAsModule {
 			}
 		}
 	}
+	Write-Debug "Uninstallation from '$ModulePath' complete"
 }
 
 $_PowerShellModuleFolders = @{
@@ -102,16 +106,13 @@ $_PowerShellModuleFolders = @{
 	CurrentUser  = (Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "WindowsPowerShell\Modules\")
 }
 
-Write-Debug ""
-Write-Debug "Advanced functions added to current session."
+Write-Debug "Exported functions added to current session."
 
 if ($Uninstall) {
 	Uninstall-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Uninstall]
-	Write-Debug "Advanced functions removed from $($_PowerShellModuleFolders[$Uninstall])"
 }
 elseif ($Install) {
 	Install-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Install]
-	Write-Debug "Advanced functions installed to $($_PowerShellModuleFolders[$Install])"
 }
 else {
 	Write-Debug "Use -Install to add functions permanenently."
@@ -168,8 +169,8 @@ function Import-Env {
 	- Force: Variables are always expanded
 	- Ignore: Variables are never expanded
 
-	.PARAMETER MergeEnvironmentVariables
-	MergeEnvironmentVariables determines if the current processs environment variables are merged with the imported variables
+	.PARAMETER IncludeSystemVariables
+	IncludeSystemVariables determines if the current processs environment variables are merged with the imported variables
 	If set all imported variables are added to the current process environment variables, existing variables are overwritten
 	If not set only imported variables are returned
 
@@ -258,7 +259,7 @@ function Import-Env {
 		[Parameter(Mandatory = $false)][Alias('e')]
 		[ImportEnvExpand] $Expand = [ImportEnvExpand]::Default,
 		[Parameter(Mandatory = $false)][Alias('m')]
-		[switch] $MergeEnvironmentVariables
+		[switch] $IncludeSystemVariables
 	)
 
 	begin {
@@ -266,7 +267,7 @@ function Import-Env {
 		[int] $success_count = 0
 		[string[]] $failures = @()
 
-		if ($MergeEnvironmentVariables) {
+		if ($IncludeSystemVariables) {
 			# GetEnvironmentVariables returns a IDictionary, not a IDictionary[string, string]
 			# The key and value are [string]s
 			# Validate keys and values, and convert to Dictionary[string, string]
@@ -798,7 +799,7 @@ function Use-Env {
 	)
 
 	# the current environment variables
-	[System.Collections.Generic.Dictionary[string, string]] $current_vars = Import-Env -MergeEnvironmentVariables
+	[System.Collections.Generic.Dictionary[string, string]] $current_vars = Import-Env -IncludeSystemVariables
 	# merge with the specified variables
 	[System.Collections.Generic.Dictionary[string, string]] $target_vars = [System.Collections.Generic.Dictionary[string, string]]::new($current_vars)
 	foreach ($key_value_pair in $Variables.GetEnumerator()) {
@@ -881,19 +882,19 @@ function dotenv {
 
 	# append configuration specific env files
 	if ($null -ne $Configuration) {
+		$Configuration = [string]$Configuration
 		if ($Configuration -ne '') {
 			$EnvFiles = _add_configuration $EnvFiles $Configuration
 		}
 		$EnvFiles = _add_configuration $EnvFiles 'local'
 	}
 	# load the process environment
-	[System.Collections.Generic.Dictionary[string, string]] $vars = Import-Env -MergeEnvironmentVariables
+	[System.Collections.Generic.Dictionary[string, string]] $vars = Import-Env -IncludeSystemVariables
 	# load the env files
-	($EnvFiles | Import-Env).GetEnumerator() | ForEach-Object {
-		_merge_var $vars $_.Key $_.Value }
+	($EnvFiles | Import-Env).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
 	# load the custom variables
-	($Variables | Import-Env).GetEnumerator() | ForEach-Object {
-		 _merge_var $vars $_.Key $_.Value }
+	($Variables | Import-Env).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
+
 	if ($Probes) {
 		# export the probe variables
 		foreach ($probe in $Probes.GetEnumerator()) {
@@ -902,6 +903,7 @@ function dotenv {
 			}
 		}
 	}
+
 	if ($Command) {
 		# execute the command
 		$vars | Use-Env $Command
