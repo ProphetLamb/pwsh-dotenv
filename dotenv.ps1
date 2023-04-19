@@ -12,12 +12,6 @@ Param(
 ###= dotenv\dotenv.psd1
 ###############################################################################
 
-function Invoke-TemplateTest {
-	[CmdletBinding()]
-	Param()
-
-	Write-Host "This is a test function"
-}
 @{
 	ModuleVersion     = '0.1.0'
 	RootModule        = 'dotenv.psm1'
@@ -435,18 +429,18 @@ function Import-Env {
 				# return the key and value
 				return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, $value)
 			}
-			$match_span = "'$($match.Index)..$($match.Index + $match.Length - 1)'"
+			$match_span = "$($match.Index)..$($match.Index + $match.Length - 1)"
 
 			$key = $match.Groups["key_only"].Value
 			if ($key) {
-				Write-Warning "Invalid variable format: Missing '=' sign after key '$key' at $match_span'. Ignoring variable."
+				Write-Warning "Invalid variable format: Missing '=' sign after key '$key' at $match_span. Ignoring variable."
 				return
 			}
 
 			$key = $match.Groups["key"].Value.Trim()
 			# validate the key against [a-zA-Z_]+[a-zA-Z0-9_]*
 			if ($key -notmatch '^[a-zA-Z_]+[a-zA-Z0-9_]+$') {
-				Write-Warning "Invalid variable format: Invalid key '$key' at $match_span'. Ignoring variable."
+				Write-Warning "Invalid variable format: Invalid key '$key' at $match_span. Ignoring variable."
 				return
 			}
 
@@ -454,7 +448,7 @@ function Import-Env {
 			if ($value) {
 				# ensure the value does not start with ", because this is a missing terminating "
 				if ($value.Contains('"') -or $value.Contains("'")) {
-					Write-Warning "Invalid variable format: Quotation disallowed in simple expressions $($match.Index)..$($match.Index + $match.Length)'. Using the value as-is."
+					Write-Warning "Invalid variable format: Quotation disallowed in simple expressions at $match_span. Using the value as-is."
 				}
 				$value = $value.TrimEnd()
 				return _interpret_match_core $key $value Simple
@@ -511,9 +505,10 @@ function Import-Env {
 					$success_count += 1
 				}
 				catch {
-					# write the exception to the console as a warning
-					Write-Warning $_
-					$failures += "InputStream@$($file.Length)"
+					# write the exception to the console
+					$file = "InputStream@$($file.Length)"
+					Write-Error "Failed to proccess the file '$file': $_"
+					$failures += $file
 				}
 			}
 		}
@@ -526,8 +521,8 @@ function Import-Env {
 					$success_count += 1
 				}
 				catch {
-					# write the exception to the console as a warning
-					Write-Warning $_
+					# write the exception to the console
+					Write-Error "Failed to proccess the file '$file': $_"
 					$failures += $file
 				}
 			}
@@ -542,10 +537,10 @@ function Import-Env {
 			Write-Warning 'No files loaded'
 		}
 
-		if ($failure_count -gt 0) {
-			Write-Warning "Failed to load $failure_count out of $total_count files: $failures"
-		}
 		Write-Host "Import-Env : Sucessfully loaded $success_count files" -ForegroundColor Green
+		if ($failure_count -gt 0) {
+			throw "Failed to load $failure_count out of $total_count files: $failures"
+		}
 	}
 }
 
@@ -660,7 +655,7 @@ function Export-Env {
 				$success_count += 1
 			}
 			catch {
-				Write-Warning "environment variable '$name' could not be assgined to target '$Target': $_"
+				Write-Error "Failed to assing variable '$name' to target '$Target': $_"
 				$failures += $name
 			}
 		}
@@ -673,9 +668,9 @@ function Export-Env {
 			Write-Warning "No variables exported"
 		}
 
-		if ($failure_count -gt 0) {
-			Write-Warning "Failed to export $failure_count out of $total_count variables: $failures"
-		}
 		Write-Host "Export-Env : Sucessfully exported $success_count variables" -ForegroundColor Green
+		if ($failure_count -gt 0) {
+			throw "Failed to export $failure_count out of $total_count variables: $failures"
+		}
 	}
 }

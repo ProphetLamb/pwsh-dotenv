@@ -7,6 +7,7 @@ BeforeAll {
     }
     return $hash
   }
+  $ErrorActionPreference = 'SilentlyContinue'
 }
 
 Describe 'Import-Env' {
