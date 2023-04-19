@@ -9,7 +9,6 @@ BeforeAll {
   }
 }
 
-
 Describe 'Import-Env' {
   It 'should import the environment variables from the .env file' {
     $vars = Import-Env '.\.env'

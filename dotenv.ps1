@@ -1,3 +1,124 @@
+###############################################################################
+# Self installation
+###############################################################################
+# Self installation Source https://github.com/jpassing/powershell-install-as-module/blob/master/Install-Template.ps1 licensed under APACHE 2.0
+[CmdletBinding()]
+Param(
+	[Parameter(Mandatory = $false)][ValidateSet("LocalMachine", "CurrentUser")][string] $Install,
+	[Parameter(Mandatory = $false)][ValidateSet("LocalMachine", "CurrentUser")][string] $Uninstall
+)
+
+###############################################################################
+###= dotenv\dotenv.psd1
+###############################################################################
+
+function Invoke-TemplateTest {
+	[CmdletBinding()]
+	Param()
+
+	Write-Host "This is a test function"
+}
+@{
+	ModuleVersion     = '0.1.0'
+	RootModule        = 'dotenv.psm1'
+	FunctionsToExport = @(
+		'Import-Env',
+		'Export-Env'
+	)
+}
+
+###############################################################################
+###=
+###############################################################################
+
+function Install-ScriptAsModule {
+	<#
+			.SYNOPSIS
+					Generate a Powershell module from this script and install it.
+	#>
+	Param(
+		[Parameter(Mandatory = $True)][string]$ModulePath,
+		[Parameter(Mandatory = $false)][string]$Prefix = "###="
+	)
+
+	$OutputFile = $Null
+	$FullOutputPath = $Null
+	Get-Content $script:MyInvocation.MyCommand.Path | Foreach-Object {
+		if ($_.StartsWith($Prefix)) {
+			# Start a new file
+			$OutputFile = $_.Substring($Prefix.Length).Trim()
+
+			if ($OutputFile) {
+				$FullOutputPath = (Join-Path -Path $ModulePath -ChildPath $OutputFile)
+
+				New-Item `
+					-ItemType Directory `
+					-Force -Path ([System.IO.Path]::GetDirectoryName($FullOutputPath)) | Out-Null
+
+				# Truncate file
+				"" | Out-File  $FullOutputPath
+			}
+		}
+		elseif ($OutputFile) {
+			# Keep appending to file
+			$_ | Out-File  $FullOutputPath -Append
+		}
+	}
+}
+
+function Uninstall-ScriptAsModule {
+	<#
+			.SYNOPSIS
+					Renove Powershell module that has been generated from this script.
+	#>
+	Param(
+		[Parameter(Mandatory = $True)][string]$ModulePath,
+		[Parameter(Mandatory = $false)][string]$Prefix = "###="
+	)
+
+	Get-Content $script:MyInvocation.MyCommand.Path | Where-Object { $_.StartsWith($Prefix) } | Foreach-Object {
+		$OutputFile = $_.Substring($Prefix.Length).Trim()
+
+		if ($OutputFile) {
+			$FullOutputPath = (Join-Path -Path $ModulePath -ChildPath $OutputFile)
+
+			if (Test-Path $FullOutputPath) {
+				Remove-Item -Force $FullOutputPath
+			}
+		}
+	}
+}
+
+$_PowerShellModuleFolders = @{
+	LocalMachine = (Join-Path -Path $Env:ProgramFiles -ChildPath "WindowsPowerShell\Modules\");
+	CurrentUser  = (Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "WindowsPowerShell\Modules\")
+}
+
+Write-Host ""
+Write-Host "Advanced functions added to current session."
+
+if ($Uninstall) {
+	Uninstall-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Uninstall]
+	Write-Host "Advanced functions removed from $($_PowerShellModuleFolders[$Uninstall])"
+}
+elseif ($Install) {
+	Install-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Install]
+	Write-Host "Advanced functions installed to $($_PowerShellModuleFolders[$Install])"
+}
+else {
+	Write-Host "Use -Install to add functions permanenently."
+}
+
+###############################################################################
+###= dotenv\dotenv.psm1
+###############################################################################
+
+#Requires -version 4
+
+Set-StrictMode -Version Latest
+
+$ErrorActionPreference = 'Stop'
+
 enum ImportEnvExpand {
 	Default
 	Force
@@ -558,4 +679,3 @@ function Export-Env {
 		Write-Host "Export-Env : Sucessfully exported $success_count variables" -ForegroundColor Green
 	}
 }
-
