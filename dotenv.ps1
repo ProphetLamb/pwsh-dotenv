@@ -194,7 +194,7 @@ if ($UninstallModulePath) {
 if ($InstallModulePath) {
 	Install-ScriptAsModule $InstallModulePath
 }
-if (-not $Install -and -not $Uninstall) {
+if (-not $Install -and -not $Uninstall -and -not $InstallModulePath -and -not $UninstallModulePath) {
 	Write-Debug "Use -Install to add functions permanenently."
 }
 
