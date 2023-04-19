@@ -17,7 +17,9 @@ Param(
 	RootModule        = 'dotenv.psm1'
 	FunctionsToExport = @(
 		'Import-Env',
-		'Export-Env'
+		'Export-Env',
+		'Use-Env',
+		'dotenv'
 	)
 }
 
@@ -828,13 +830,11 @@ function dotenv {
 	Overwrite the variables from the env files
 
 	.PARAMETER Command
-	The commend to execute
+	The command to execute
 
 	.EXAMPLE
-	An example
 
 	.NOTES
-	General notes
 	#>
 	param(
 		[Parameter(Mandatory = $true)][Alias('e')]
