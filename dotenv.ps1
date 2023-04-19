@@ -631,7 +631,7 @@ function Export-Env {
 
 	.EXAMPLE
 	Get-Item '.env' | Import-Env | Export-Env -Target Pipe 1> tmp.env
-	Imports the file '.env'
+	Imports the file '.env' and stores the environment variables in the file 'tmp.env'
 
 	.EXAMPLE
 	Import-Env .env,.env_test | Export-Env
@@ -810,12 +810,40 @@ function Use-Env {
 }
 
 function dotenv {
-	[Parameter(Mandatory = $true)][Alias('e')]
-	[string[]] $EnvFiles,
-	[Parameter(Mandatory = $false)][Alias('c')]
-	[string] $Configuration,
-	[Parameter(Mandatory = $false)][Alias('v')]
-	[string[]] $Variables,
-	[Parameter(Mandatory = $false, Position = 0)]
-	[string] $Command
+	<#
+	.SYNOPSIS
+	dotenv-cli like tool for PowerShell
+
+	.DESCRIPTION
+	Internally uses the functions Import-Env, Export-Env, Use-Env to provide an interface simmilar to dotenv-cli
+
+	.PARAMETER EnvFiles
+	The env files to use
+
+	.PARAMETER Configuration
+	The env configuration to use
+
+	.PARAMETER Variables
+	The list of custom variables to use
+	Overwrite the variables from the env files
+
+	.PARAMETER Command
+	The commend to execute
+
+	.EXAMPLE
+	An example
+
+	.NOTES
+	General notes
+	#>
+	param(
+		[Parameter(Mandatory = $true)][Alias('e')]
+		[string[]] $EnvFiles,
+		[Parameter(Mandatory = $false)][Alias('c')]
+		[string] $Configuration,
+		[Parameter(Mandatory = $false)][Alias('v')]
+		[string[]] $Variables,
+		[Parameter(Mandatory = $false, Position = 0)]
+		[string] $Command
+	)
 }
