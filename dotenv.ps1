@@ -271,7 +271,7 @@ function Import-Env {
 			# GetEnvironmentVariables returns a IDictionary, not a IDictionary[string, string]
 			# The key and value are [string]s
 			# Validate keys and values, and convert to Dictionary[string, string]
-			foreach ($key_value_pair in [System.Environment]::GetEnvironmentVariables([System.EnvironmentVariableTarget]::Process).GetEnumerator()) {
+			foreach ($key_value_pair in [System.Environment]::GetEnvironmentVariables().GetEnumerator()) {
 				if ($key_value_pair.Key) {
 					$variables[$key_value_pair.Key] = if ($key_value_pair.Value) { $key_value_pair.Value } else { $null }
 				}
@@ -372,7 +372,7 @@ function Import-Env {
 				return $value
 			}
 			# attempt to get the environment variable
-			$value = [System.Environment]::GetEnvironmentVariable($name, [System.EnvironmentVariableTarget]::Process)
+			$value = [System.Environment]::GetEnvironmentVariable($name)
 			if ($value) {
 				return $value
 			}
