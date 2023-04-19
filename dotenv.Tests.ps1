@@ -1,22 +1,16 @@
 BeforeAll {
   . $PSScriptRoot/dotenv.ps1
-  function ConvertTo-HashTable($key_value_pairs) {
-    $hash = @{}
-    $key_value_pairs | ForEach-Object {
-      $hash[$_.Key] = if ($_.Value) { $_.Value } else { $null }
-    }
-    return $hash
-  }
   $ErrorActionPreference = 'Continue'
   $WarningPreference = 'Continue'
+  $DebugPreference = 'Continue'
 }
 
 Describe 'Import-Env' {
   It 'should import the environment variables from the .env file' {
     $vars = Import-Env '.\.env'
     $vars | Should -Not -BeNullOrEmpty
-    $vars | Should -HaveCount 11
-    $keys = $vars.Key
+    $vars.GetEnumerator() | Should -HaveCount 10
+    $keys = $vars.Keys
     $keys | Should -Contain 'Hello'
     $keys | Should -Contain 'Multi'
     $keys | Should -Contain 'WhiteSpace'
@@ -30,16 +24,12 @@ Describe 'Import-Env' {
 
   It 'should expand all variables when Expand Force is set' {
     $vars = Import-Env .\.env -Expand Force
-    # convert vars to a hashtable
-    $vars = ConvertTo-HashTable $vars
     # check if the SingleQuoteNoVar variable was expanded from $Hello to ''
-    $vars['SingleQuoteNoVar'] | Should -Be $null
+    $vars['SingleQuoteNoVar'] | Should -Be ''
   }
 
   It 'should never expand variables when Expand Never is set' {
     $vars = Import-Env .\.env -Expand Never
-    # convert vars to a hashtable
-    $vars = ConvertTo-HashTable $vars
     # check if the SingleQuoteNoVar variable was expanded from $Hello to ''
     $vars['SingleQuoteNoVar'] | Should -Be '$Hello'
     # check if DoubleQuote was expanded from ${Multi}Value to Line\"\nStringValue
@@ -60,14 +50,13 @@ Describe 'Export-Env' {
   It 'should export process environment variables' {
     # clear all relevant environment variables
     $vars = Import-Env '.\.env'
-    $vars | ForEach-Object { "`$env:$($_.Key)=''" | Invoke-Expression }
+    $vars.GetEnumerator() | ForEach-Object { "`$env:$($_.Key)=''" | Invoke-Expression }
     # export to the current process
-    $vars | Export-Env -Target Process -Debug
-    # convert vars to a hashtable
-    $vars = ConvertTo-HashTable $vars
+    $vars | Export-Env -Target Process
     # get the exported variables by the keys in vars and verify they are have the same value
     $vars.GetEnumerator() | ForEach-Object {
-      $_.Value | Should -Be ("`$env:$($_.Key)" | Invoke-Expression)
+      $value = if ($_.Value) { $_.Value } else { $null }
+      $value | Should -Be ("`$env:$($_.Key)" | Invoke-Expression)
     }
   }
 }
