@@ -48,6 +48,25 @@ Param(
 # Copyright (c) 2019, Johannes Passing
 # Self installation https://github.com/jpassing/powershell-install-as-module/ licensed under the APACHE 2.0 License
 
+function Get-OsSensitiveStringComparer {
+	<#
+	.SYNOPSIS
+	Get a string comparer with case sensitivity depending on the current OS
+
+	.DESCRIPTION
+	Windows is case insensitive, Linux & MacOS are case sensitive
+	#>
+	[OutputType([System.Collections.Generic.IEqualityComparer[string]])]
+	param()
+
+	if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
+		[System.StringComparer]::InvariantCultureIgnoreCase()
+	}
+	else {
+		[System.StringComparer]::InvariantCulture()
+	}
+}
+
 function Install-ScriptAsModule {
 	<#
 			.SYNOPSIS
@@ -88,7 +107,7 @@ function Install-ScriptAsModule {
 function Uninstall-ScriptAsModule {
 	<#
 			.SYNOPSIS
-					Renove Powershell module that has been generated from this script.
+					Remove Powershell module that has been generated from this script.
 	#>
 	Param(
 		[Parameter(Mandatory = $True)][string]$ModulePath,
@@ -273,7 +292,7 @@ function Import-Env {
 	)
 
 	begin {
-		$variables = [System.Collections.Generic.Dictionary[string, string]]::new()
+		$variables = [System.Collections.Generic.Dictionary[string, string]]::new((Get-OsSensitiveStringComparer))
 		[int] $success_count = 0
 		[string[]] $failures = @()
 
@@ -814,7 +833,7 @@ function Use-Env {
 	# the current environment variables
 	[System.Collections.Generic.Dictionary[string, string]] $current_vars = Import-Env -IncludeSystemVariables
 	# merge with the specified variables
-	[System.Collections.Generic.Dictionary[string, string]] $target_vars = [System.Collections.Generic.Dictionary[string, string]]::new($current_vars)
+	[System.Collections.Generic.Dictionary[string, string]] $target_vars = [System.Collections.Generic.Dictionary[string, string]]::new($current_vars, (Get-OsSensitiveStringComparer))
 	foreach ($key_value_pair in $Variables.GetEnumerator()) {
 		if ($key_value_pair.Key) {
 			$target_vars[$key_value_pair.Key] = if ($key_value_pair.Value) { $key_value_pair.Value } else { $null }
