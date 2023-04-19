@@ -111,8 +111,6 @@ else {
 
 Set-StrictMode -Version Latest
 
-$ErrorActionPreference = 'Stop'
-
 enum ImportEnvExpand {
 	Default
 	Force
@@ -499,7 +497,7 @@ function Import-Env {
 			}
 
 			if ($failure_count -gt 0) {
-				Write-Error "Invalid .env file format: $($match_collection.Count - $failure_count) lines loaded, $failure_count lines failed. See above for details."
+				Write-Error "Invalid .env file format: $($match_collection.Count - $failure_count) lines loaded, $failure_count lines failed. See warnings for details."
 			}
 		}
 	}
@@ -678,7 +676,7 @@ function Export-Env {
 		##
 		# Main Logic
 		##
-		foreach ($key_value_pair in $Variables) {
+		foreach ($key_value_pair in $Variables.GetEnumerator()) {
 			[string] $name = $key_value_pair.Key
 			[string] $value = $key_value_pair.Value
 
