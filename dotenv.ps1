@@ -22,7 +22,9 @@ Install dotenv to maschine
 [CmdletBinding()]
 Param(
 	[Parameter(Mandatory = $false)][ValidateSet("LocalMachine", "CurrentUser")][string] $Install,
-	[Parameter(Mandatory = $false)][ValidateSet("LocalMachine", "CurrentUser")][string] $Uninstall
+	[Parameter(Mandatory = $false)][ValidateSet("LocalMachine", "CurrentUser")][string] $Uninstall,
+	[Parameter(Mandatory = $false)][ValidateScript({ if (-not ($_ | Test-Path -PathType Container)) { throw "The directory '$_' does not exist" } $true })][System.IO.DirectoryInfo] $InstallModulePath = $null,
+	[Parameter(Mandatory = $false)][ValidateScript({ if (-not ($_ | Test-Path -PathType Container)) { throw "The directory '$_' does not exist" } $true })][System.IO.DirectoryInfo] $UninstallModulePath = $null
 )
 
 ###############################################################################
@@ -69,7 +71,7 @@ function Install-ScriptAsModule {
 	Generate a Powershell module from this script and install it.
 	#>
 	Param(
-		[Parameter(Mandatory = $True)][string]$ModulePath
+		[Parameter(Mandatory = $True, Position = 0)][System.IO.DirectoryInfo]$ModulePath
 	)
 
 	function _add_content_to_filebuffer([System.Collections.Generic.Dictionary[string, [System.Text.StringBuilder]]] $file_buffers, [string] $file_name, [string] $file_content) {
@@ -111,11 +113,8 @@ function Install-ScriptAsModule {
 		$file_name = $file_and_content.Key
 		Write-Debug "Creating '$file_name'"
 		$file_content = $file_and_content.Value.ToString()
-		$full_file_path = Join-Path -Path $ModulePath -ChildPath $file_name
-		$full_file_directory = [System.IO.Path]::GetDirectoryName($full_file_path)
-		if (-not (Test-Path -Path $full_file_directory)) {
-			New-Item -ItemType Directory -Force -Path $full_file_directory | Out-Null
-		}
+		$full_file_path = Join-Path -Path $ModulePath.FullName -ChildPath $file_name
+		[void][System.IO.Directory]::CreateDirectory((Split-Path -Path $full_file_path -Parent))
 		$file_content | Out-File -FilePath $full_file_path -Encoding UTF8 -Force
 	}
 	Write-Debug "Installation to '$ModulePath' complete"
@@ -127,7 +126,7 @@ function Uninstall-ScriptAsModule {
 					Remove Powershell module that has been generated from this script.
 	#>
 	Param(
-		[Parameter(Mandatory = $True)][string]$ModulePath
+		[Parameter(Mandatory = $True, Position = 0)][System.IO.DirectoryInfo]$ModulePath
 	)
 
 	$master_file_content = Get-Content $script:MyInvocation.MyCommand.Path -Raw -Encoding UTF8
@@ -138,7 +137,7 @@ function Uninstall-ScriptAsModule {
 			continue
 		}
 		Write-Debug "Removing '$file_name'"
-		$full_file_path = Join-Path -Path $ModulePath -ChildPath $file_name
+		$full_file_path = Join-Path -Path $ModulePath.FullName -ChildPath $file_name
 		if (Test-Path -Path $full_file_path) {
 			Remove-Item -Force -Path $full_file_path
 		}
@@ -146,12 +145,36 @@ function Uninstall-ScriptAsModule {
 	Write-Debug "Uninstallation from '$ModulePath' complete"
 }
 
-$_PowerShellModuleFolders = @{
-	LocalMachine = @(
+# check for the presence of windows powershell and powershell core
+# install the module to all available locations
+function _validate_module_dirs([string[]] $module_dirs) {
+	foreach ($dir in $module_dirs | ForEach-Object { [System.IO.Path]::GetFullPath($_) } | Select-Object -Unique) {
+		[System.IO.DirectoryInfo] $dir = [System.IO.DirectoryInfo]::new($dir)
+		if (-not $dir.Parent.Exists) {
+			Write-Debug "Powershell installation not found at '$dir'"
+			continue
+		}
+		if ($dir.Exists) {
+			$dir
+		}
+		Write-Debug "Creating module directory '$dir'"
+		try {
+			[void]$dir.Create()
+		}
+		catch {
+			Write-Debug "Failed to create module directory '$dir'"
+			continue
+		}
+		$dir
+	}
+}
+$_pwsh_module_dirs = @{
+	LocalMachine = _validate_module_dirs @(
 		(Join-Path -Path $Env:ProgramFiles -ChildPath "WindowsPowerShell\Modules\"),
-		(Join-Path -Path $Env:ProgramFiles -ChildPath "PowerShell\Modules\")
+		(Join-Path -Path $Env:ProgramFiles -ChildPath "PowerShell\$($PSVersionTable.PSVersion.Major)\Modules\"),
+		$PSHOME
 	)
-	CurrentUser  = @(
+	CurrentUser  = _validate_module_dirs @(
 		(Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "WindowsPowerShell\Modules\"),
 		(Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "PowerShell\Modules\")
 	)
@@ -159,11 +182,17 @@ $_PowerShellModuleFolders = @{
 
 Write-Debug "Exported functions added to current session."
 
-foreach ($directory in $_PowerShellModuleFolders[$Uninstall]) {
-	Uninstall-ScriptAsModule -ModulePath $directory
+foreach ($directory in $_pwsh_module_dirs[$Uninstall]) {
+	Uninstall-ScriptAsModule $directory
 }
-foreach ($directory in $_PowerShellModuleFolders[$Install]) {
-	Install-ScriptAsModule -ModulePath $directory
+foreach ($directory in $_pwsh_module_dirs[$Install]) {
+	Install-ScriptAsModule $directory
+}
+if ($UninstallModulePath) {
+	Uninstall-ScriptAsModule $UninstallModulePath
+}
+if ($InstallModulePath) {
+	Install-ScriptAsModule $InstallModulePath
 }
 if (-not $Install -and -not $Uninstall) {
 	Write-Debug "Use -Install to add functions permanenently."
