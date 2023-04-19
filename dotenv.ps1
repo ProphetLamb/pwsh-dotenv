@@ -460,6 +460,10 @@ function Import-Env {
 				if ($value.Contains('"') -or $value.Contains("'")) {
 					Write-Warning "Invalid variable format: Quotation disallowed in simple expressions at $match_span. Using the value as-is."
 				}
+				if ($value.Contains('=')) {
+					Write-Warning "Invalid variable format: Hidden environment variables are dissallowed. Ignoring variable."
+					return
+				}
 				$value = $value.TrimEnd()
 				return _interpret_match_core $key $value Simple
 			}
