@@ -40,47 +40,83 @@ Param(
 		'Use-Env',
 		'dotenv'
 	)
+	Author            = 'ProphetLamb'
+	Copyright         = '(c) 2023, ProphetLamb'
+	Description       = 'Dotenv for Powershell'
+	PowerShellVersion = '5.1'
+	PrivateData       = @{
+		PSData = @{
+			Tags       = @('dotenv', 'env', 'environment', 'environment variables')
+			ProjectUri = 'https://github.com/ProphetLamb/pwsh-dotenv'
+		}
+	}
 }
 
 ###############################################################################
 ###=
 ###############################################################################
+# Copyright (c) 2023, ProphetLamb
+# Dotenv for Powershell https://github.com/ProphetLamb/pwsh-dotenv/ dual licensed under the MIT & APACHE 2.0 License at your option
 # Copyright (c) 2019, Johannes Passing
 # Self installation https://github.com/jpassing/powershell-install-as-module/ licensed under the APACHE 2.0 License
+$_file_delimiter_regex = [System.Text.RegularExpressions.Regex]::new(@'
+(?si)##[#]+\s*?\n###=\s*(?<file_name>[^\n]*?)\n##[#]+\s*?\n?
+'@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 function Install-ScriptAsModule {
 	<#
-			.SYNOPSIS
-					Generate a Powershell module from this script and install it.
+	.SYNOPSIS
+	Generate a Powershell module from this script and install it.
 	#>
 	Param(
-		[Parameter(Mandatory = $True)][string]$ModulePath,
-		[Parameter(Mandatory = $false)][string]$Prefix = "###="
+		[Parameter(Mandatory = $True)][string]$ModulePath
 	)
 
-	$OutputFile = $Null
-	$FullOutputPath = $Null
-	Get-Content $script:MyInvocation.MyCommand.Path | Foreach-Object {
-		if ($_.StartsWith($Prefix)) {
-			# Start a new file
-			$OutputFile = $_.Substring($Prefix.Length).Trim()
-
-			if ($OutputFile) {
-				Write-Debug "Installing '$OutputFile'"
-				$FullOutputPath = (Join-Path -Path $ModulePath -ChildPath $OutputFile)
-
-				New-Item `
-					-ItemType Directory `
-					-Force -Path ([System.IO.Path]::GetDirectoryName($FullOutputPath)) | Out-Null
-
-				# Truncate file
-				"" | Out-File  $FullOutputPath
-			}
+	function _add_content_to_filebuffer([System.Collections.Generic.Dictionary[string, [System.Text.StringBuilder]]] $file_buffers, [string] $file_name, [string] $file_content) {
+		$file_content = $file_content.Trim()
+		$file_name = $file_name.Trim()
+		if (-not $file_content -or -not $file_name) {
+			return
 		}
-		elseif ($OutputFile) {
-			# Keep appending to file
-			$_ | Out-File  $FullOutputPath -Append
+		# get or create the buffer for the file
+		$file_buffer = $file_buffers[$file_name]
+		if (-not $file_buffer) {
+			$file_buffer = [System.Text.StringBuilder]::new()
+			[void]$file_buffers.Add($file_name, $file_buffer)
 		}
+		# append the content of the file
+		[void]$file_buffer.Append($file_content)
+	}
+
+	$master_file_content = Get-Content $script:MyInvocation.MyCommand.Path -Raw -Encoding UTF8
+	# $master_file_content = Get-Content 'D:\source\repos\pwsh-dotenv\dotenv.ps1' -Raw -Encoding UTF8
+	[System.Text.RegularExpressions.MatchCollection] $file_delimiter_matches = $_file_delimiter_regex.Matches($master_file_content)
+	$file_buffers = [System.Collections.Generic.Dictionary[string, [System.Text.StringBuilder]]]::new()
+	$partial_file_name = $null
+	$master_file_start = 0
+
+	foreach ($file_delimiter in $file_delimiter_matches.GetEnumerator()) {
+		$file_delimiter_start = $file_delimiter.Index
+		$file_delimiter_end = $file_delimiter_start + $file_delimiter.Length
+		$partial_file_content = $master_file_content.Substring($master_file_start, $file_delimiter_start - 1 - $master_file_start)
+		# from $master_file_start to $file_delimiter_start is the content of the previous file
+		_add_content_to_filebuffer $file_buffers $partial_file_name $partial_file_content
+		$master_file_start = $file_delimiter_end
+		$partial_file_name = $file_delimiter.Groups["file_name"].Value
+	}
+	# add the remaining content of the master file
+	_add_content_to_filebuffer $file_buffers $partial_file_name $master_file_content.Substring($master_file_start)
+
+	foreach ($file_and_content in $file_buffers.GetEnumerator()) {
+		$file_name = $file_and_content.Key
+		Write-Debug "Creating '$file_name'"
+		$file_content = $file_and_content.Value.ToString()
+		$full_file_path = Join-Path -Path $ModulePath -ChildPath $file_name
+		$full_file_directory = [System.IO.Path]::GetDirectoryName($full_file_path)
+		if (-not (Test-Path -Path $full_file_directory)) {
+			New-Item -ItemType Directory -Force -Path $full_file_directory | Out-Null
+		}
+		$file_content | Out-File -FilePath $full_file_path -Encoding UTF8 -Force
 	}
 	Write-Debug "Installation to '$ModulePath' complete"
 }
@@ -91,39 +127,45 @@ function Uninstall-ScriptAsModule {
 					Remove Powershell module that has been generated from this script.
 	#>
 	Param(
-		[Parameter(Mandatory = $True)][string]$ModulePath,
-		[Parameter(Mandatory = $false)][string]$Prefix = "###="
+		[Parameter(Mandatory = $True)][string]$ModulePath
 	)
 
-	Get-Content $script:MyInvocation.MyCommand.Path | Where-Object { $_.StartsWith($Prefix) } | Foreach-Object {
-		$OutputFile = $_.Substring($Prefix.Length).Trim()
-
-		if ($OutputFile) {
-			Write-Debug "Uninstalling '$OutputFile'"
-			$FullOutputPath = (Join-Path -Path $ModulePath -ChildPath $OutputFile)
-
-			if (Test-Path $FullOutputPath) {
-				Remove-Item -Force $FullOutputPath
-			}
+	$master_file_content = Get-Content $script:MyInvocation.MyCommand.Path -Raw -Encoding UTF8
+	[System.Text.RegularExpressions.MatchCollection] $file_delimiter_matches = $_file_delimiter_regex.Matches($master_file_content)
+	foreach ($file_delimiter in $file_delimiter_matches.GetEnumerator()) {
+		$file_name = $file_delimiter.Groups["file_name"].Value
+		if (-not $file_name) {
+			continue
+		}
+		Write-Debug "Removing '$file_name'"
+		$full_file_path = Join-Path -Path $ModulePath -ChildPath $file_name
+		if (Test-Path -Path $full_file_path) {
+			Remove-Item -Force -Path $full_file_path
 		}
 	}
 	Write-Debug "Uninstallation from '$ModulePath' complete"
 }
 
 $_PowerShellModuleFolders = @{
-	LocalMachine = (Join-Path -Path $Env:ProgramFiles -ChildPath "WindowsPowerShell\Modules\");
-	CurrentUser  = (Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "WindowsPowerShell\Modules\")
+	LocalMachine = @(
+		(Join-Path -Path $Env:ProgramFiles -ChildPath "WindowsPowerShell\Modules\"),
+		(Join-Path -Path $Env:ProgramFiles -ChildPath "PowerShell\Modules\")
+	)
+	CurrentUser  = @(
+		(Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "WindowsPowerShell\Modules\"),
+		(Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "PowerShell\Modules\")
+	)
 }
 
 Write-Debug "Exported functions added to current session."
 
-if ($Uninstall) {
-	Uninstall-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Uninstall]
+foreach ($directory in $_PowerShellModuleFolders[$Uninstall]) {
+	Uninstall-ScriptAsModule -ModulePath $directory
 }
-elseif ($Install) {
-	Install-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Install]
+foreach ($directory in $_PowerShellModuleFolders[$Install]) {
+	Install-ScriptAsModule -ModulePath $directory
 }
-else {
+if (-not $Install -and -not $Uninstall) {
 	Write-Debug "Use -Install to add functions permanenently."
 }
 
@@ -132,7 +174,6 @@ else {
 ###############################################################################
 # Copyright (c) 2023, ProphetLamb
 # Dotenv for Powershell https://github.com/ProphetLamb/pwsh-dotenv/ dual licensed under the MIT & APACHE 2.0 License at your option
-#Requires -version 4
 
 Set-StrictMode -Version Latest
 
@@ -148,10 +189,10 @@ function Get-OsSensitiveStringComparer {
 	param()
 
 	if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
-		[System.StringComparer]::InvariantCultureIgnoreCase()
+		[System.StringComparer]::InvariantCultureIgnoreCase
 	}
 	else {
-		[System.StringComparer]::InvariantCulture()
+		[System.StringComparer]::InvariantCulture
 	}
 }
 
@@ -392,7 +433,7 @@ function Import-Env {
 		}
 
 		function _get_env_var([string] $name) {
-			if (!$name -or $name -eq '') {
+			if (-not $name -or $name -eq '') {
 				return ''
 			}
 			# attempt to get the value from the $variables
@@ -447,7 +488,7 @@ function Import-Env {
 
 		function _load_file([string] $file)	{
 			# if file exists, load it
-			if (!(Test-Path $file)) {
+			if (-not (Test-Path $file)) {
 				throw "Error loading file '$file': File not found"
 			}
 			$file_content = Get-Content $file -Raw -Encoding $Encoding
@@ -485,89 +526,89 @@ function Import-Env {
 
 		function _interpret_match([System.Text.RegularExpressions.Match] $match) {
 			function _trim_newline([string] $value) {
-				<#
+					<#
 					Trim the first and last newline character from a string.
 				#>
-				if ($value.EndsWith("`n")) {
-					$value = $value.Substring(0, $value.Length - 1)
+					if ($value.EndsWith("`n")) {
+						$value = $value.Substring(0, $value.Length - 1)
+					}
+					elseif ($value.EndsWith("`r`n")) {
+						$value = $value.Substring(0, $value.Length - 2)
+					}
+					elseif ($value.EndsWith("`r")) {
+						$value = $value.Substring(0, $value.Length - 1)
+					}
+					if ($value.StartsWith("`n")) {
+						$value = $value.Substring(1)
+					}
+					elseif ($value.StartsWith("`r`n")) {
+						$value = $value.Substring(2)
+					}
+					elseif ($value.StartsWith("`r")) {
+						$value = $value.Substring(1)
+					}
+					return $value
 				}
-				elseif ($value.EndsWith("`r`n")) {
-					$value = $value.Substring(0, $value.Length - 2)
+				function _interpret_match_core([string] $key, [string] $value, [ImportEnvValueType] $value_type) {
+					# expand environment variables
+					$value = _expand_env_vars $value $value_type
+					# unescape the value
+					$value = _unescape $value $value_type
+					# return the key and value
+					return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, $value)
 				}
-				elseif ($value.EndsWith("`r")) {
-					$value = $value.Substring(0, $value.Length - 1)
+				$match_span = "$($match.Index)..$($match.Index + $match.Length - 1)"
+
+				$key = $match.Groups["key_only"].Value
+				if ($key) {
+					Write-Warning "Invalid variable format: Missing '=' sign after key '$key' at $match_span. Ignoring variable."
+					return
 				}
-				if ($value.StartsWith("`n")) {
-					$value = $value.Substring(1)
+
+				$key = $match.Groups["key"].Value.Trim()
+				if ($key.Length -eq 0) {
+					Write-Warning "Invalid variable format: Hidden environment variables are not allowed: '=HIDDEN=VALUE'. Ignoring variable."
+					return
 				}
-				elseif ($value.StartsWith("`r`n")) {
-					$value = $value.Substring(2)
+				# validate the key against [a-zA-Z_]+[a-zA-Z0-9_]*
+				if ($key -notmatch $key_regex) {
+					Write-Warning "Invalid variable format: Invalid key '$key' at $match_span. Ignoring variable."
+					return
 				}
-				elseif ($value.StartsWith("`r")) {
-					$value = $value.Substring(1)
+
+				$value = $match.Groups["value_simple"].Value.Trim()
+				if ($value) {
+					# ensure the value does not start with ", because this is a missing terminating "
+					if ($value.Contains('"') -or $value.Contains("'")) {
+						Write-Warning "Invalid variable format: Quotation disallowed in simple expressions at $match_span. Using the value as-is."
+					}
+					$value = $value.TrimEnd()
+					return _interpret_match_core $key $value Simple
 				}
-				return $value
-			}
-			function _interpret_match_core([string] $key, [string] $value, [ImportEnvValueType] $value_type) {
-				# expand environment variables
-				$value = _expand_env_vars $value $value_type
-				# unescape the value
-				$value = _unescape $value $value_type
-				# return the key and value
-				return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, $value)
-			}
-			$match_span = "$($match.Index)..$($match.Index + $match.Length - 1)"
 
-			$key = $match.Groups["key_only"].Value
-			if ($key) {
-				Write-Warning "Invalid variable format: Missing '=' sign after key '$key' at $match_span. Ignoring variable."
-				return
-			}
-
-			$key = $match.Groups["key"].Value.Trim()
-			if ($key.Length -eq 0) {
-				Write-Warning "Invalid variable format: Hidden environment variables are not allowed: '=HIDDEN=VALUE'. Ignoring variable."
-				return
-			}
-			# validate the key against [a-zA-Z_]+[a-zA-Z0-9_]*
-			if ($key -notmatch $key_regex) {
-				Write-Warning "Invalid variable format: Invalid key '$key' at $match_span. Ignoring variable."
-				return
-			}
-
-			$value = $match.Groups["value_simple"].Value.Trim()
-			if ($value) {
-				# ensure the value does not start with ", because this is a missing terminating "
-				if ($value.Contains('"') -or $value.Contains("'")) {
-					Write-Warning "Invalid variable format: Quotation disallowed in simple expressions at $match_span. Using the value as-is."
+				# handle interpolated values
+				$value = $match.Groups["value_inter"].Value
+				$value = if ($value) { $value } else { _trim_newline $match.Groups["value_inter_multi"].Value }
+				if ($value) {
+					return _interpret_match_core $key $value Interpolated
 				}
-				$value = $value.TrimEnd()
-				return _interpret_match_core $key $value Simple
+
+				#handle literal values
+				$value = $match.Groups["value_literal"].Value
+				$value = if ($value) { $value } else { _trim_newline $match.Groups["value_literal_multi"].Value }
+				if ($value) {
+					return _interpret_match_core $key $value Literal
+				}
+
+				return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, '')
 			}
+			function _parse_file_content([string] $file_content) {
+				$match_collection = _parse_matches $file_content
 
-			# handle interpolated values
-			$value = $match.Groups["value_inter"].Value
-			$value = if ($value) { $value } else { _trim_newline $match.Groups["value_inter_multi"].Value }
-			if ($value) {
-				return _interpret_match_core $key $value Interpolated
-			}
-
-			#handle literal values
-			$value = $match.Groups["value_literal"].Value
-			$value = if ($value) { $value } else { _trim_newline $match.Groups["value_literal_multi"].Value }
-			if ($value) {
-				return _interpret_match_core $key $value Literal
-			}
-
-			return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, '')
-		}
-		function _parse_file_content([string] $file_content) {
-			$match_collection = _parse_matches $file_content
-
-			$failure_count = 0
-			$match_collection | ForEach-Object {
-				$key_value_pair = _interpret_match $_
-				if (!$key_value_pair) {
+				$failure_count = 0
+				$match_collection | ForEach-Object {
+					$key_value_pair = _interpret_match $_
+					if (-not $key_value_pair) {
 					$failure_count += 1
 				}
 				else {
