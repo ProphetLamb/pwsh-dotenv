@@ -17,7 +17,19 @@ Load dotenv for the current session
 Install dotenv to user profile
 .EXAMPLE
 . ./dotenv.ps1 -Install LocalMachine
-Install dotenv to maschine
+Install dotenv to maschine#
+.EXAMPLE
+. ./dotenv.ps1 -InstallModulePath ".\MyModules" && Import-Module .\MyModules\dotenv
+Install dotenv to the specified directory and load it for the current session
+.EXAMPLE
+. ./dotenv.ps1 -Uninstall CurrentUser
+Uninstall dotenv from user profile
+.EXAMPLE
+. ./dotenv.ps1 -Uninstall LocalMachine
+Uninstall dotenv from maschine
+.EXAMPLE
+Remove-Module dotenv && . ./dotenv.ps1 -UninstallModulePath ".\MyModules"
+Uninstall dotenv from the specified directory
 #>
 [CmdletBinding()]
 Param(
