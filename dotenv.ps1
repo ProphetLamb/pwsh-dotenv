@@ -885,6 +885,10 @@ function dotenv {
 		$env_files
 	}
 
+	# if no env files are specified, use the default .env
+	if ($EnvFiles.Count -eq 0) {
+		$EnvFiles += '.env'
+	}
 	# append configuration specific env files
 	if ($null -ne $Configuration) {
 		$Configuration = [string]$Configuration
