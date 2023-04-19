@@ -808,3 +808,14 @@ function Use-Env {
 		Write-Host "Use-Env : Restored $($current_vars.Count) environment variables" -ForegroundColor Green
 	}
 }
+
+function dotenv {
+	[Parameter(Mandatory = $true)][Alias('e')]
+	[string[]] $EnvFiles,
+	[Parameter(Mandatory = $false)][Alias('c')]
+	[string] $Configuration,
+	[Parameter(Mandatory = $false)][Alias('v')]
+	[string[]] $Variables,
+	[Parameter(Mandatory = $false, Position = 0)]
+	[string] $Command
+}
