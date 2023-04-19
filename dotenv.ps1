@@ -450,6 +450,10 @@ function Import-Env {
 			return $match_collection | Where-Object { $_ -and $_.Success -and ($_.Groups["key"].Success -or $_.Groups["key_only"].Success) }
 		}
 
+		$key_regex = [System.Text.RegularExpressions.Regex]::new(@'
+^[a-zA-Z_]+[a-zA-Z0-9_]*$
+'@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
+
 		function _interpret_match([System.Text.RegularExpressions.Match] $match) {
 			function _trim_newline([string] $value) {
 				<#
@@ -497,7 +501,7 @@ function Import-Env {
 				return
 			}
 			# validate the key against [a-zA-Z_]+[a-zA-Z0-9_]*
-			if ($key -notmatch '^[a-zA-Z_]+[a-zA-Z0-9_]*$') {
+			if ($key -notmatch $key_regex) {
 				Write-Warning "Invalid variable format: Invalid key '$key' at $match_span. Ignoring variable."
 				return
 			}
