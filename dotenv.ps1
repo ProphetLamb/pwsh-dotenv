@@ -134,8 +134,8 @@ function Install-ScriptAsModule {
 
 function Uninstall-ScriptAsModule {
 	<#
-			.SYNOPSIS
-					Remove Powershell module that has been generated from this script.
+	.SYNOPSIS
+	Remove Powershell module that has been generated from this script.
 	#>
 	Param(
 		[Parameter(Mandatory = $True, Position = 0)][System.IO.DirectoryInfo]$ModulePath
@@ -160,23 +160,31 @@ function Uninstall-ScriptAsModule {
 # check for the presence of windows powershell and powershell core
 # install the module to all available locations
 function _validate_module_dirs([string[]] $module_dirs) {
-	foreach ($dir in $module_dirs | ForEach-Object { [System.IO.Path]::GetFullPath($_) } | Select-Object -Unique) {
+	$unique_dirs = [System.Collections.Generic.HashSet[string]]::new()
+	foreach ($dir in $module_dirs) {
+		$dir = [System.IO.Path]::GetFullPath($dir)
+		if (-not $unique_dirs.Contains($dir)) {
+			[void]$unique_dirs.Add($dir)
+		}
+		else {
+			continue
+		}
 		[System.IO.DirectoryInfo] $dir = [System.IO.DirectoryInfo]::new($dir)
 		if (-not $dir.Parent.Exists) {
-			Write-Debug "Powershell installation not found at '$dir'"
+			Write-Debug "Powershell installation not found at '$($dir.Parent.FullName)'"
 			continue
 		}
-		if ($dir.Exists) {
-			$dir
+		if (-not $dir.Exists) {
+			Write-Debug "Creating module directory '$dir'"
+			try {
+				[void]$dir.Create()
+			}
+			catch {
+				Write-Debug "Failed to create module directory '$dir': $_"
+				continue
+			}
 		}
-		Write-Debug "Creating module directory '$dir'"
-		try {
-			[void]$dir.Create()
-		}
-		catch {
-			Write-Debug "Failed to create module directory '$dir'"
-			continue
-		}
+		Write-Debug "Powershell installation found at '$($dir.Parent.FullName)'"
 		$dir
 	}
 }
