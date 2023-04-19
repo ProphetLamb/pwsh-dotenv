@@ -487,7 +487,7 @@ function Import-Env {
 			if ($value) {
 				return $value
 			}
-			Write-Warning "Environment variable '$name' does not exist"
+			Write-Warning "Environment variable '$name' does not exist. Assuming empty string."
 			return ''
 		}
 
@@ -535,7 +535,7 @@ function Import-Env {
 			$file_content = Get-Content $file -Raw -Encoding $Encoding
 			# if the file is empty, return
 			if ($file_content.Length -eq 0) {
-				Write-Warning "File '$file' is empty"
+				Write-Debug "File '$file' is empty"
 			}
 			return $file_content
 		}
@@ -658,7 +658,7 @@ function Import-Env {
 			}
 
 			if ($failure_count -gt 0) {
-				Write-Error "Invalid .env file format: $($match_collection.Count - $failure_count) lines loaded, $failure_count lines failed. See warnings for details."
+				Write-Warning "Invalid .env file format: $($match_collection.Count - $failure_count) lines loaded, $failure_count lines failed. See warnings for details."
 			}
 		}
 	}
@@ -667,6 +667,10 @@ function Import-Env {
 		##
 		# Main Logic
 		##
+		if (-not $File) {
+			Write-Debug 'File parameter is empty'
+			return
+		}
 		if ($Raw) {
 			if ($File.Length -ne 1) {
 				Write-Warning 'To support multiline values Raw mode requires the content to be passed as a single [string] into the -File parameter'
@@ -679,7 +683,7 @@ function Import-Env {
 				catch {
 					# write the exception to the console
 					$file = "InputStream@$($file.Length)"
-					Write-Error "Failed to proccess the file '$file': $_"
+					Write-Warning "Failed to proccess the file '$file': $_"
 					$failures += $file
 				}
 			}
@@ -689,12 +693,14 @@ function Import-Env {
 			foreach ($file in $File) {
 				try {
 					$file_content = _load_file $file
-					_parse_file_content $file_content
+					if ($file_content) {
+						_parse_file_content $file_content
+					}
 					$success_count += 1
 				}
 				catch {
 					# write the exception to the console
-					Write-Error "Failed to proccess the file '$file': $_"
+					Write-Warning "Failed to proccess the file '$file': $_"
 					$failures += $file
 				}
 			}
@@ -709,7 +715,7 @@ function Import-Env {
 		$total_count = $failure_count + $success_count
 		# if filename is not specified, use local .env
 		if ($total_count -eq 0) {
-			Write-Warning 'No files loaded'
+			Write-Debug 'No files loaded'
 		}
 
 		Write-Debug "Import-Env : Sucessfully loaded $success_count files"
@@ -849,7 +855,7 @@ function Export-Env {
 				$success_count += 1
 			}
 			catch {
-				Write-Error "Failed to assing variable '$name' to target '$Target': $_"
+				Write-Warning "Failed to assign variable '$name' to target '$Target': $_"
 				$failures += $name
 			}
 		}
@@ -859,7 +865,7 @@ function Export-Env {
 		$failure_count = $failures.Count
 		$total_count = $failure_count + $success_count
 		if ($total_count -eq 0) {
-			Write-Warning "No variables exported"
+			Write-Debug "No variables exported"
 		}
 
 		Write-Debug "Export-Env : Sucessfully exported $success_count variables"
@@ -1013,9 +1019,13 @@ function dotenv {
 	# load the process environment
 	[System.Collections.Generic.Dictionary[string, string]] $vars = Import-Env -IncludeSystemVariables
 	# load the env files
-	($EnvFiles | Import-Env).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
+	if ($EnvFiles) {
+		($EnvFiles | Import-Env).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
+	}
 	# load the custom variables
-	($Variables | Import-Env -Raw).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
+	if ($Variables) {
+		($Variables | Import-Env -Raw).GetEnumerator() | ForEach-Object { _merge_var $vars $_.Key $_.Value }
+	}
 
 	if ($Probes) {
 		# export the probe variables
