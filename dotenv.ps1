@@ -181,6 +181,18 @@ function Import-Env {
 	Imports the file '.env' and exports the variables into the Process environment
 
 	.EXAMPLE
+	.env | Import-Env
+	Imports the file '.env' from the pipeline
+
+	.EXAMPLE
+	Import-Env -Raw 'KEY=VALUE', "KEY2=`"`nMultiline`nValue`""
+	Imports the variable KEY and KEY2 from arguments
+
+	.EXAMPLE
+	'KEY=VALUE', "KEY2=`"`nMultiline`nValue`"" | Import-Env -Raw
+	Imports the variable KEY and KEY2 from the pipeline
+
+	.EXAMPLE
 	See Export-Env for an example of how to use the output of Import-Env
 
 	.EXAMPLE
@@ -626,8 +638,8 @@ function Export-Env {
 	Imports the files '.env' and '.env_test' to the process scope
 
 	.EXAMPLE
-	@(.env,.env_test) | Import-Env | Export-Env
-	Imports the variables of the files '.env' and '.env_test' to the process scope
+	.env,.env.test | Import-Env | Export-Env
+	Imports the variables of the files '.env' and '.env.test' to the process scope
 
 	.EXAMPLE
 	Import-Env .env | Export-Env -Target User
