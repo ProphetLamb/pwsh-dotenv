@@ -88,19 +88,19 @@ $_PowerShellModuleFolders = @{
 	CurrentUser  = (Join-Path -Path ([environment]::getfolderpath("mydocuments")) -ChildPath "WindowsPowerShell\Modules\")
 }
 
-Write-Host ""
-Write-Host "Advanced functions added to current session."
+Write-Debug ""
+Write-Debug "Advanced functions added to current session."
 
 if ($Uninstall) {
 	Uninstall-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Uninstall]
-	Write-Host "Advanced functions removed from $($_PowerShellModuleFolders[$Uninstall])"
+	Write-Debug "Advanced functions removed from $($_PowerShellModuleFolders[$Uninstall])"
 }
 elseif ($Install) {
 	Install-ScriptAsModule -ModulePath $_PowerShellModuleFolders[$Install]
-	Write-Host "Advanced functions installed to $($_PowerShellModuleFolders[$Install])"
+	Write-Debug "Advanced functions installed to $($_PowerShellModuleFolders[$Install])"
 }
 else {
-	Write-Host "Use -Install to add functions permanenently."
+	Write-Debug "Use -Install to add functions permanenently."
 }
 
 ###############################################################################
@@ -581,7 +581,7 @@ function Import-Env {
 			Write-Warning 'No files loaded'
 		}
 
-		Write-Host "Import-Env : Sucessfully loaded $success_count files" -ForegroundColor Green
+		Write-Debug "Import-Env : Sucessfully loaded $success_count files"
 		if ($failure_count -gt 0) {
 			Write-Error "Failed to load $failure_count out of $total_count files: $failures"
 		}
@@ -731,7 +731,7 @@ function Export-Env {
 			Write-Warning "No variables exported"
 		}
 
-		Write-Host "Export-Env : Sucessfully exported $success_count variables" -ForegroundColor Green
+		Write-Debug "Export-Env : Sucessfully exported $success_count variables"
 		if ($failure_count -gt 0) {
 			throw "Failed to export $failure_count out of $total_count variables: $failures"
 		}
@@ -783,7 +783,7 @@ function Use-Env {
 	)
 
 	# the current environment variables
-	[System.Collections.Generic.Dictionary[string, string]] $current_vars = Import-Env -MergeEnvironmentVariables 6> $null
+	[System.Collections.Generic.Dictionary[string, string]] $current_vars = Import-Env -MergeEnvironmentVariables
 	# merge with the specified variables
 	[System.Collections.Generic.Dictionary[string, string]] $target_vars = [System.Collections.Generic.Dictionary[string, string]]::new($current_vars)
 	foreach ($key_value_pair in $Variables.GetEnumerator()) {
@@ -796,16 +796,16 @@ function Use-Env {
 		}
 	}
 	# export the variables
-	$target_vars | Export-Env -Target Process 6> $null
-	Write-Host "Use-Env : Executing the command with $($target_vars.Count) environment variables"
+	$target_vars | Export-Env -Target Process
+	Write-Debug "Use-Env : Executing the command with $($target_vars.Count) environment variables"
 	# execute the command
 	try {
 		Invoke-Expression $Command
 	}
 	finally {
 		# restore the environment variables
-		$current_vars | Export-Env -Target Process 6> $null
-		Write-Host "Use-Env : Restored $($current_vars.Count) environment variables" -ForegroundColor Green
+		$current_vars | Export-Env -Target Process
+		Write-Debug "Use-Env : Restored $($current_vars.Count) environment variables"
 	}
 }
 
