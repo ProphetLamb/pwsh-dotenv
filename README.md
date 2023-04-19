@@ -4,6 +4,12 @@ Fully fleshed out .env file utilities written in pwsh.
 
 ## Quickstart
 
+Download the single all-in-one script.
+
+```bash
+iwr https://raw.githubusercontent.com/ProphetLamb/pwsh-dotenv/main/dotenv.ps1 -o dotenv.ps1
+```
+
 For usage in automation the module provides an API similar to [dotenv-cli](https://github.com/entropitor/dotenv-cli).
 
 ```pwsh
