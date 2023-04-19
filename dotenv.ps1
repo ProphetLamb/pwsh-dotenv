@@ -214,7 +214,7 @@ function Import-Env {
 	-----END DSA PRIVATE KEY-----
 
 	'''                   # Tailing line breaks are removed
-	DISSALLOWED           # This is not a valid variable name
+	=HIDDEN=DISSALLOWED   # This is ignored
 	AnotherVariable=Hello # This is a comment
   #>
 	[OutputType([System.Collections.Generic.Dictionary[string, string]])]
@@ -386,7 +386,7 @@ function Import-Env {
 		}
 
 		$expr_regex = [System.Text.RegularExpressions.Regex]::new(@'
-(?si)(?<key>[^\n\s#]+?)\s*=\s*(?:(?:"""(?<value_inter_multi>(.*(?=""")))""")|(?:"(?<value_inter>(?:[^\\"]|\\.)*?)")|(?:'''(?<value_literal_multi>(?:.*(?=''')))''')|(?:'(?<value_literal>(?:[^\\']|\\.)*?)')|(?<value_simple>[^"\n#]+)|(?<value_none>\s*\n))|(?<comment>\#[^\n]*)|(?<key_only>[^\n\s#]+)|(?<whitespace>\s+|\n+|$)
+(?si)(?<key>[^\n\s#]*?)\s*=\s*(?:(?:"""(?<value_inter_multi>(.*(?=""")))""")|(?:"(?<value_inter>(?:[^\\"]|\\.)*?)")|(?:'''(?<value_literal_multi>(?:.*(?=''')))''')|(?:'(?<value_literal>(?:[^\\']|\\.)*?)')|(?<value_simple>[^"\n#]+)|(?<value_none>\s*\n))|(?<comment>\#[^\n]*)|(?<key_only>[^\n\s#]+)|(?<whitespace>\s+|\n+|$)
 '@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 		function _parse_matches([string] $file_content) {
@@ -403,7 +403,7 @@ function Import-Env {
 				throw "Error loading file: Invalid .env file format: Failed to parse the entire file"
 			}
 			# only return key-value pair matches, even if empty
-			return $match_collection | Where-Object { $_ -and $_.Success -and ($_.Groups["key"].Value -or $_.Groups["key_only"].Value) }
+			return $match_collection | Where-Object { $_ -and $_.Success -and ($_.Groups["key"].Success -or $_.Groups["key_only"].Success) }
 		}
 
 		function _interpret_match([System.Text.RegularExpressions.Match] $match) {
@@ -448,8 +448,12 @@ function Import-Env {
 			}
 
 			$key = $match.Groups["key"].Value.Trim()
+			if ($key.Length -eq 0) {
+				Write-Warning "Invalid variable format: Hidden environment variables are not allowed: '=HIDDEN=VALUE'. Ignoring variable."
+				return
+			}
 			# validate the key against [a-zA-Z_]+[a-zA-Z0-9_]*
-			if ($key -notmatch '^[a-zA-Z_]+[a-zA-Z0-9_]+$') {
+			if ($key -notmatch '^[a-zA-Z_]+[a-zA-Z0-9_]*$') {
 				Write-Warning "Invalid variable format: Invalid key '$key' at $match_span. Ignoring variable."
 				return
 			}
@@ -459,10 +463,6 @@ function Import-Env {
 				# ensure the value does not start with ", because this is a missing terminating "
 				if ($value.Contains('"') -or $value.Contains("'")) {
 					Write-Warning "Invalid variable format: Quotation disallowed in simple expressions at $match_span. Using the value as-is."
-				}
-				if ($value.Contains('=')) {
-					Write-Warning "Invalid variable format: Hidden environment variables are dissallowed. Ignoring variable."
-					return
 				}
 				$value = $value.TrimEnd()
 				return _interpret_match_core $key $value Simple
