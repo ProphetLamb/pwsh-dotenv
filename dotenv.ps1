@@ -234,7 +234,7 @@ function Import-Env {
   #>
 	[OutputType([System.Collections.Generic.Dictionary[string, string]])]
 	param (
-		[Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
+		[Parameter(Mandatory = $false, Position = 0, ValueFromPipeline = $true)]
 		[string[]] $File,
 		[Parameter(Mandatory = $false)]
 		$Encoding = 'utf8',
@@ -691,11 +691,14 @@ function Export-Env {
 				$value = _escape $value
 				Write-Output -InputObject "$name=`"$value`""
 			}
+			elseif ($Target -eq [ExportEnvTarget]::Process) {
+				# thrid parameter is a unavailable on Linux
+				[System.Environment]::SetEnvironmentVariable($name, $value)
+			}
 			else {
 				$target = switch ($Target) {
 					[ExportEnvTarget]::Machine { [System.EnvironmentVariableTarget]::Machine }
 					[ExportEnvTarget]::User { [System.EnvironmentVariableTarget]::User }
-					[ExportEnvTarget]::Process { [System.EnvironmentVariableTarget]::Process }
 				}
 				[System.Environment]::SetEnvironmentVariable($name, $value, $target)
 			}
