@@ -122,99 +122,109 @@ enum ImportEnvExpand {
 function Import-Env {
 	<#
 	.SYNOPSIS
-		Import environment variables from a .env file
-	.DESCRIPTION
-		Import environment variables from a .env file.
-		The .env file should be a list of lines in the format of KEY=VALUE
-		Variables denoted by $ are interpreted as environment variables. This occurs recursively.
-		Comments are denoted by # and are ignored.
-	.PARAMETER File
-		The name of the file, or an array of file names to load
-	.PARAMETER Encoding
-		The encoding of the file, if not specified the default is 'utf-8' see [System.Text.Encoding]::GetEncodings() for a list of encodings.
-		Same as Get-Content -Encoding
-	.PARAMETER Raw
-		Raw enables reading of arbitary string content from the pipeline. E.g. 'Get-Content .env -Raw -Encoding utf8 | Import-Env -Raw'
-		If Raw is set:
-		- The File parameter is expected to contain the string content in the correct (utf8) encoding.
-		- The Encoding parameter is ignored.
-		The user MUST ensure the content is NOT SPLIT by line breaks. This causes the parser to FAIL reading multiline values.
-		This is achieved by e.g. passing the -Raw parameter to Get-Content.
-	.PARAMETER Expand
-		Expand determines if and how variables are expanded.
-		A variable is a string of the form $VAR or ${VAR} where VAR is a environment variable name.
-		Non existing environment variables are replaced with empty strings. A warning is emmited.
-		Variables are expanded recursively, i.e. if the replacement for a variable contains a variable, it is expanded as well. This occurs up a depth of 10, after which an error is emmited.
-		Expand can be one of three values:
-		- Default: Variables are interpreted as descibed in the Notes section.
-		- Force: Variables are always expanded.
-		- Ignore: Variables are never expanded.
-	.INPUTS
-		The string[] of file names to import, same as the file_name parameter
-		If Raw is set, the string content of the file(s) to import.
-	.OUTPUTS
-		The success stream (1) is reserved for pipeline output, and will be used to pipe the environment variables to the next command.
-		The output is a stream of [System.Collections.Generic.KeyValuePair[string, string]] objects
-	.LINK
-		The specification of the .env format can be found at https://hexdocs.pm/dotenvy/dotenv-file-format.html
-	.NOTES
-		Values can be one of three types, denoted by the quotation marks.
-		- Unquoted values: Escape sequences are disabled, Expressions are enabled
-		- Single quoted values: Escape sequences are disabled, Expressions are diseabled
-		- Double quoted values: Escape sequences are enabled, Expressions are enabled
-		Use three consecutive quotes for multiline values, the leading and trailing line breaks are removed. The settings of the quotes used are applied.
-	.EXAMPLE
-		Import-Env .env | Export-Env
-		Imports the file '.env' and exports the variables into the Process environment
-	.EXAMPLE
-		See Export-Env for an example of how to use the output of Import-Env
-	.EXAMPLE
-		cat .env
-		# Unquoted
-		Hello=World
-		# Clear the variable
-		Hello=
-		# Double quoted
-		Multi="Line\"\nString"
-		# Unquoted, Variable, Tailing comment
-		WhiteSpace = None $Hello # Inline Comment
-		# Double quoted, Variable
-		DoubleQuote="${Multi}Value"
-		# Double quoted, Multiline, Variable
-		DoubleQuoteMultiline="""
-		asdasd
-		asdasd # Not A Comment
-		asdasd
-		$DoubleQuote
-		"""
-		# Unicode
-		Unicode=äöüß
-		# Single quoted, no escape sequences
-		SingleQuote='\n\o\t \e\s\c\a\p\e\d' # A comment'
-		# Single quoted, no variable
-		SingleQuoteNoVar='$Hello'
-		# Single quoted, multiline
-		PRIVATE_KEY='''
-		-----BEGIN RSA PRIVATE KEY-----
-		...
-		HkVN9...
-		...
-		-----END DSA PRIVATE KEY-----
+	Import environment variables from a .env file
 
-		'''                   # Tailing line breaks are removed
-		DISSALLOWED           # This is not a valid variable name
-		AnotherVariable=Hello # This is a comment
+	.DESCRIPTION
+	Import environment variables from a .env file.
+	The .env file should be a list of lines in the format of KEY=VALUE
+	Variables denoted by $ are interpreted as environment variables. This occurs recursively
+	Comments are denoted by # and are ignored.
+
+	.PARAMETER File
+	The name of the file, or an array of file names to load
+
+	.PARAMETER Encoding
+	The encoding of the file, if not specified the default is 'utf-8' see [System.Text.Encoding]::GetEncodings() for a list of encodings
+	Same as Get-Content -Encoding
+
+	.PARAMETER Raw
+	Raw enables reading of arbitary string content from the pipeline. E.g. 'Get-Content .env -Raw -Encoding utf8 | Import-Env -Raw'
+	If Raw is set:
+	- The File parameter is expected to contain the string content in the correct (utf8) encoding.
+	- The Encoding parameter is ignored.
+	The user MUST ensure the content is NOT SPLIT by line breaks. This causes the parser to FAIL reading multiline values.
+	This is achieved by e.g. passing the -Raw parameter to Get-Content.
+
+	.PARAMETER Expand
+	Expand determines if and how variables are expanded
+	A variable is a string of the form $VAR or ${VAR} where VAR is a environment variable name
+	Non existing environment variables are replaced with empty strings. A warning is emmited
+	Variables are expanded recursively, i.e. if the replacement for a variable contains a variable, it is expanded as well. This occurs up a depth of 10, after which an error is emmited
+	Expand can be one of three values:
+	- Default: Variables are interpreted as descibed in the Notes section
+	- Force: Variables are always expanded
+	- Ignore: Variables are never expanded
+
+	.INPUTS
+	The string[] of file names to import, same as the file_name parameter
+	If Raw is set, the string content of the file(s) to import
+
+	.OUTPUTS
+	The success stream (1) is reserved for pipeline output, and will be used to pipe the environment variables to the next command
+	The output is a stream of [System.Collections.Generic.KeyValuePair[string, string]] objects
+
+	.LINK
+	The specification of the .env format can be found at https://hexdocs.pm/dotenvy/dotenv-file-format.html
+
+	.NOTES
+	Values can be one of three types, denoted by the quotation marks
+	- Unquoted values: Escape sequences are disabled, Expressions are enabled
+	- Single quoted values: Escape sequences are disabled, Expressions are diseabled
+	- Double quoted values: Escape sequences are enabled, Expressions are enabled
+	Use three consecutive quotes for multiline values, the leading and trailing line breaks are removed. The settings of the quotes used are applied
+
+	.EXAMPLE
+	Import-Env .env | Export-Env
+	Imports the file '.env' and exports the variables into the Process environment
+
+	.EXAMPLE
+	See Export-Env for an example of how to use the output of Import-Env
+
+	.EXAMPLE
+	cat .env
+	# Unquoted
+	Hello=World
+	# Clear the variable
+	Hello=
+	# Double quoted
+	Multi="Line\"\nString"
+	# Unquoted, Variable, Tailing comment
+	WhiteSpace = None $Hello # Inline Comment
+	# Double quoted, Variable
+	DoubleQuote="${Multi}Value"
+	# Double quoted, Multiline, Variable
+	DoubleQuoteMultiline="""
+	asdasd
+	asdasd # Not A Comment
+	asdasd
+	$DoubleQuote
+	"""
+	# Unicode
+	Unicode=äöüß
+	# Single quoted, no escape sequences
+	SingleQuote='\n\o\t \e\s\c\a\p\e\d' # A comment'
+	# Single quoted, no variable
+	SingleQuoteNoVar='$Hello'
+	# Single quoted, multiline
+	PRIVATE_KEY='''
+	-----BEGIN RSA PRIVATE KEY-----
+	...
+	HkVN9...
+	...
+	-----END DSA PRIVATE KEY-----
+
+	'''                   # Tailing line breaks are removed
+	DISSALLOWED           # This is not a valid variable name
+	AnotherVariable=Hello # This is a comment
   #>
-	[OutputType([System.Collections.Generic.KeyValuePair[string, string][]])]
+	[OutputType([System.Collections.Generic.Dictionary[string, string]])]
 	param (
 		[Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
-		[string[]]
-		$File,
+		[string[]] $File,
 		[Parameter(Mandatory = $false)]
 		$Encoding = 'utf8',
 		[Parameter(Mandatory = $false)]
-		[switch]
-		$Raw,
+		[switch] $Raw,
 		[Parameter(Mandatory = $false)]
 		[ImportEnvExpand] $Expand = [ImportEnvExpand]::Default
 	)
@@ -481,7 +491,6 @@ function Import-Env {
 				}
 				else {
 					$variables[$key_value_pair.Key] = $key_value_pair.Value
-					Write-Output $key_value_pair -NoEnumerate
 				}
 			}
 
@@ -530,6 +539,9 @@ function Import-Env {
 	}
 
 	end {
+		# output variables
+		$variables
+
 		$failure_count = $failures.Count
 		$total_count = $failure_count + $success_count
 		# if filename is not specified, use local .env
@@ -544,57 +556,73 @@ function Import-Env {
 	}
 }
 
+enum ExportEnvTarget {
+	Process
+	User
+	Machine
+	Pipe
+}
+
 function Export-Env {
 	<#
 	.SYNOPSIS
-		Exports the key-value pairs to environment variables
-	.DESCRIPTION
-		The key-value pairs are exported to the specified target. For environment variables that can be the scopes process, user, or machine.
-		For the pipe target, the key-value pairs are piped to the next command using the Success (1) stream.
-	.PARAMETER Variables
-		An array of [System.Collections.Generic.KeyValuePair[string, string]] variables to export
-	.PARAMETER Target
-		The target to export the environment variables to
-		If not specified, the default is 'Process'
-		Variables will always be read from the process scope, regardless of the scope specified
+	Exports the key-value pairs to environment variables
 
-		Targets:
-		- Process enviroment variables the current process, and any child processes
-		- User enviroment variablesis only available on Windows
-		- Machine enviroment variables require elevated privileges
-		- Pipe does not set the environment variables, but instead pipes them to the next command using the Success (1) stream.
+	.DESCRIPTION
+	The key-value pairs are exported to the specified target. For environment variables that can be the scopes process, user, or machine.
+	For the pipe target, the key-value pairs are piped to the next command using the Success (1) stream.
+
+	.PARAMETER Variables
+	An array of [System.Collections.Generic.KeyValuePair[string, string]] variables to export
+
+	.PARAMETER Target
+	The target to export the environment variables to
+	If not specified, the default is 'Process'
+	Variables will always be read from the process scope, regardless of the scope specified
+
+	Targets:
+	- Process enviroment variables the current process, and any child processes
+	- User enviroment variablesis only available on Windows
+	- Machine enviroment variables require elevated privileges
+	- Pipe does not set the environment variables, but instead pipes them to the next command using the Success (1) stream.
+
 	.INPUTS
-		[System.Collections.Generic.KeyValuePair[string, string]] Variables same as the output of Import-Env
+	[System.Collections.Generic.KeyValuePair[string, string]] Variables same as the output of Import-Env
+
 	.OUTPUTS
-		The success stream (1) is reserved for pipeline output, and will be used to pipe the environment variables to the next command.
-		If the target is not 'Pipe', the output will be empty.
-		The content is a stream of [string] key-value pairs in the format key="value" with the value normalized to a single line by escaping offending characters.
+	The success stream (1) is reserved for pipeline output, and will be used to pipe the environment variables to the next command.
+	If the target is not 'Pipe', the output will be empty.
+	The content is a stream of [string] key-value pairs in the format key="value" with the value normalized to a single line by escaping offending characters.
+
 	.LINK
-		The specification of the .env format can be found at https://hexdocs.pm/dotenvy/dotenv-file-format.html
+	The specification of the .env format can be found at https://hexdocs.pm/dotenvy/dotenv-file-format.html
+
 	.EXAMPLE
-		Get-Item '.env' | Import-Env | Export-Env -Target Pipe 1> tmp.env
-		Imports the file '.env'
+	Get-Item '.env' | Import-Env | Export-Env -Target Pipe 1> tmp.env
+	Imports the file '.env'
+
 	.EXAMPLE
-		Import-Env .env,.env_test | Export-Env
-		Imports the files '.env' and '.env_test' to the process scope
+	Import-Env .env,.env_test | Export-Env
+	Imports the files '.env' and '.env_test' to the process scope
+
 	.EXAMPLE
-		@(.env,.env_test) | Import-Env | Export-Env
-		Imports the variables of the files '.env' and '.env_test' to the process scope
+	@(.env,.env_test) | Import-Env | Export-Env
+	Imports the variables of the files '.env' and '.env_test' to the process scope
+
 	.EXAMPLE
-		Import-Env .env | Export-Env -Target User
-		Imports the file '.env' into the user scope
+	Import-Env .env | Export-Env -Target User
+	Imports the file '.env' into the user scope
+
 	.EXAMPLE
-		Import-Env $HOME/.env | Export-Env -Target Pipe 1> .env
-		Imports the file '~/.env' and stores the environment variables in the file '.env'
+	Import-Env $HOME/.env | Export-Env -Target Pipe 1> .env
+	Imports the file '~/.env' and stores the environment variables in the file '.env'
 	#>
 	[OutputType([string[]])]
 	param(
 		[Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
-		[System.Collections.Generic.KeyValuePair[string, string][]] $Variables,
+		[System.Collections.Generic.Dictionary[string, string]] $Variables,
 		[Parameter(Mandatory = $false)]
-		[ValidateSet('Machine', 'User', 'Process', 'Pipe')]
-		[string]
-		$Target = 'Process'
+		[ExportEnvTarget] $Target = [ExportEnvTarget]::Process
 	)
 	begin {
 		$success_count = 0
@@ -626,16 +654,16 @@ function Export-Env {
 		}
 
 		function _set_env_var([string] $name, [string] $value) {
-			if ($Target -eq 'Pipe') {
+			if ($Target -eq [ExportEnvTarget]::Pipe) {
 				# pipe the environment variable to the next command
 				$value = _escape $value
 				Write-Output -InputObject "$name=`"$value`""
 			}
 			else {
 				$target = switch ($Target) {
-					'Machine' { [System.EnvironmentVariableTarget]::Machine }
-					'User' { [System.EnvironmentVariableTarget]::User }
-					'Process' { [System.EnvironmentVariableTarget]::Process }
+					[ExportEnvTarget]::Machine { [System.EnvironmentVariableTarget]::Machine }
+					[ExportEnvTarget]::User { [System.EnvironmentVariableTarget]::User }
+					[ExportEnvTarget]::Process { [System.EnvironmentVariableTarget]::Process }
 				}
 				[System.Environment]::SetEnvironmentVariable($name, $value, $target)
 			}
@@ -672,5 +700,59 @@ function Export-Env {
 		if ($failure_count -gt 0) {
 			throw "Failed to export $failure_count out of $total_count variables: $failures"
 		}
+	}
+}
+
+function Get-Env {
+	<#
+	.SYNOPSIS
+	Query variables from Import-Env in addition to the environment variables
+
+	.DESCRIPTION
+	Pass the output of Import-Env to Get-EnvVar to query the variables in addition to the environment variables
+
+	.PARAMETER Variables
+	The dictionary of key-value pairs representing the additional variables
+	Used as stream input
+
+	.PARAMETER Probe
+	Function accepting the key [string] that determines [bool] whether the variable should be returned
+
+	.INPUTS
+	[System.Collections.Generic.Dictionary[string, string]] Variables same as the output of Import-Env but as a dictionary
+	.OUTPUTS
+	[System.Collections.Generic.Dictionary[string, string]] The filtered variables
+	.LINK
+
+	.NOTES
+
+	.EXAMPLE
+
+	#>
+	[OutputType([System.Collections.Generic.Dictionary[string, string]])]
+	param(
+		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
+		[System.Collections.Generic.Dictionary[string, string]] $Variables,
+		[Parameter(Mandatory = $true, Position = 0)]
+		[Func[string, bool]] $Probe
+	)
+
+	begin {
+		$env_vars = [System.Collections.Generic.Dictionary[string, string]]::new()
+	}
+
+	process {
+		foreach ($key_value_pair in $Variables) {
+			[string] $name = $key_value_pair.Key
+			[string] $value = $key_value_pair.Value
+
+			if ($Probe.Invoke($name)) {
+				$env_vars.Add($name, $value)
+			}
+		}
+	}
+
+	end {
+		$env_vars
 	}
 }
