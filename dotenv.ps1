@@ -48,25 +48,6 @@ Param(
 # Copyright (c) 2019, Johannes Passing
 # Self installation https://github.com/jpassing/powershell-install-as-module/ licensed under the APACHE 2.0 License
 
-function Get-OsSensitiveStringComparer {
-	<#
-	.SYNOPSIS
-	Get a string comparer with case sensitivity depending on the current OS
-
-	.DESCRIPTION
-	Windows is case insensitive, Linux & MacOS are case sensitive
-	#>
-	[OutputType([System.Collections.Generic.IEqualityComparer[string]])]
-	param()
-
-	if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
-		[System.StringComparer]::InvariantCultureIgnoreCase()
-	}
-	else {
-		[System.StringComparer]::InvariantCulture()
-	}
-}
-
 function Install-ScriptAsModule {
 	<#
 			.SYNOPSIS
@@ -154,6 +135,25 @@ else {
 #Requires -version 4
 
 Set-StrictMode -Version Latest
+
+function Get-OsSensitiveStringComparer {
+	<#
+	.SYNOPSIS
+	Get a string comparer with case sensitivity depending on the current OS
+
+	.DESCRIPTION
+	Windows is case insensitive, Linux & MacOS are case sensitive
+	#>
+	[OutputType([System.Collections.Generic.IEqualityComparer[string]])]
+	param()
+
+	if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
+		[System.StringComparer]::InvariantCultureIgnoreCase()
+	}
+	else {
+		[System.StringComparer]::InvariantCulture()
+	}
+}
 
 enum ImportEnvExpand {
 	Default
