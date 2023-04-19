@@ -752,15 +752,28 @@ function Use-Env {
 
 	.PARAMETER Command
 	The command string to execute
+	Invoked using Invoke-Expression without any alterations
 
 	.INPUTS
 	[System.Collections.Generic.KeyValuePair[string, string]] Variables same as the output of Import-Env
 
 	.NOTES
-	General notes
 
 	.EXAMPLE
-	An example
+	# ensure the value is $null
+	$env:DoubleQuoteMultiline=$null
+	# use env to store the value into $test
+	$test=Import-Env .env | Use-Env '$env:DoubleQuoteMultiline'
+	# check that the variable is set
+	$test
+	> asdasd
+	> asdasd # Not A Comment
+	> asdasd
+	> Line"
+	> StringValue
+	# check that the environment variable is not set
+	$env:DoubleQuoteMultiline
+	>
 	#>
 	param(
 		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
@@ -784,6 +797,7 @@ function Use-Env {
 	}
 	# export the variables
 	$target_vars | Export-Env -Target Process 6> $null
+	Write-Host "Use-Env : Executing the command with $($target_vars.Count) environment variables"
 	# execute the command
 	try {
 		Invoke-Expression $Command
@@ -791,5 +805,6 @@ function Use-Env {
 	finally {
 		# restore the environment variables
 		$current_vars | Export-Env -Target Process 6> $null
+		Write-Host "Use-Env : Restored $($current_vars.Count) environment variables" -ForegroundColor Green
 	}
 }
