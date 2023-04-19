@@ -70,3 +70,16 @@ Describe 'Export-Env' {
     }
   }
 }
+
+Describe 'Use-Env' {
+  It 'should allow extraction of a environment variable' {
+    # ensure the value is $null
+    $env:DoubleQuoteMultiline = $null
+    # use env to store the value into $test
+    $test = Import-Env .env | Use-Env '$env:DoubleQuoteMultiline'
+    # check that the variable is set
+    $test | Should -Not -BeNullOrEmpty
+    # check that the environment variable is not set
+    $env:DoubleQuoteMultiline | Should -BeNullOrEmpty
+  }
+}
