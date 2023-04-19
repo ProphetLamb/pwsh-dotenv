@@ -737,3 +737,59 @@ function Export-Env {
 		}
 	}
 }
+
+function Use-Env {
+	<#
+	.SYNOPSIS
+	Executes a command with the specified environment variables
+
+	.DESCRIPTION
+	Executes a command with the specified environment variables
+	Ensures that the current environment variables are restored after the command is executed, even if the command fails
+
+	.PARAMETER Variables
+	A dictionary of environment variables to use
+
+	.PARAMETER Command
+	The command string to execute
+
+	.INPUTS
+	[System.Collections.Generic.KeyValuePair[string, string]] Variables same as the output of Import-Env
+
+	.NOTES
+	General notes
+
+	.EXAMPLE
+	An example
+	#>
+	param(
+		[Parameter(Mandatory = $false, ValueFromPipeline = $true)]
+		[System.Collections.Generic.Dictionary[string, string]] $Variables,
+		[Parameter(Mandatory = $true, Position = 0)]
+		$Command
+	)
+
+	# the current environment variables
+	[System.Collections.Generic.Dictionary[string, string]] $current_vars = Import-Env -MergeEnvironmentVariables 6> $null
+	# merge with the specified variables
+	[System.Collections.Generic.Dictionary[string, string]] $target_vars = [System.Collections.Generic.Dictionary[string, string]]::new($current_vars)
+	foreach ($key_value_pair in $Variables.GetEnumerator()) {
+		if ($key_value_pair.Key) {
+			$target_vars[$key_value_pair.Key] = if ($key_value_pair.Value) { $key_value_pair.Value } else { $null }
+		}
+		# ensure that the variable is reset by adding it [key]=$null to current_vars, if not already defined
+		if (-not $current_vars.ContainsKey($key_value_pair.Key)) {
+			$current_vars[$key_value_pair.Key] = $null
+		}
+	}
+	# export the variables
+	$target_vars | Export-Env -Target Process 6> $null
+	# execute the command
+	try {
+		Invoke-Expression $Command
+	}
+	finally {
+		# restore the environment variables
+		$current_vars | Export-Env -Target Process 6> $null
+	}
+}
