@@ -7,7 +7,8 @@ BeforeAll {
     }
     return $hash
   }
-  $ErrorActionPreference = 'SilentlyContinue'
+  $ErrorActionPreference = 'Continue'
+  $WarningPreference = 'Continue'
 }
 
 Describe 'Import-Env' {
