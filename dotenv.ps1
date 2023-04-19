@@ -186,6 +186,9 @@ function Import-Env {
 	The specification of the .env format can be found at https://hexdocs.pm/dotenvy/dotenv-file-format.html
 
 	.NOTES
+	Contrary to dotenv, if no files are specified none are imported
+	Variables are imported in the order of the files, later variables overwrite earlier variables
+
 	Values can be one of three types, denoted by the quotation marks
 	- Unquoted values: Escape sequences are disabled, Expressions are enabled
 	- Single quoted values: Escape sequences are disabled, Expressions are diseabled
