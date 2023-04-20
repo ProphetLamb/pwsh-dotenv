@@ -548,12 +548,52 @@ function Import-Env {
 			return $file_content
 		}
 
-		$expr_regex = [System.Text.RegularExpressions.Regex]::new(@'
-(?si)(?<key>[^\n\s#]*?)\s*=\s*(?:(?:"""(?<value_inter_multi>(.*(?=""")))""")|(?:"(?<value_inter>(?:[^\\"]|\\.)*?)")|(?:'''(?<value_literal_multi>(?:.*(?=''')))''')|(?:'(?<value_literal>(?:[^\\']|\\.)*?)')|(?<value_simple>[^"\n#]+)|(?<value_none>\s*\n))|(?<comment>\#[^\n]*)|(?<key_only>[^\n\s#]+)|(?<whitespace>\s+|\n+|$)
-'@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
+		function _expr_regex_quote_match([string] $name, [string] $quote) {
+			$tripple_quote = $quote + $quote + $quote
+			"(?:$tripple_quote(?<$($name)_multi>(.*(?=$tripple_quote)))$tripple_quote)|(?:$quote(?<$($name)>(?:[^\\$quote]|\\.)*?)$quote)"
+		}
+		function _expr_regex_get_value([System.Text.RegularExpressions.Match] $match, [string] $name) {
+			function _trim_newline([string] $value) {
+				<#
+				Trim the first and last newline character from a string.
+				#>
+				if ($value.EndsWith("`n")) {
+					$value = $value.Substring(0, $value.Length - 1)
+				}
+				elseif ($value.EndsWith("`r`n")) {
+					$value = $value.Substring(0, $value.Length - 2)
+				}
+				elseif ($value.EndsWith("`r")) {
+					$value = $value.Substring(0, $value.Length - 1)
+				}
+				if ($value.StartsWith("`n")) {
+					$value = $value.Substring(1)
+				}
+				elseif ($value.StartsWith("`r`n")) {
+					$value = $value.Substring(2)
+				}
+				elseif ($value.StartsWith("`r")) {
+					$value = $value.Substring(1)
+				}
+				return $value
+			}
+			$value = $match.Groups[$name].Value
+			if ($value) {
+				return $value
+			}
+			$value = $match.Groups[$name + '_multi'].Value
+			if ($value) {
+				return _trim_newline $value
+			}
+			return $null
+		}
+		$expr_regex = '(?si)(?<key>[^\n\s#]*?)\s*=\s*(?:' + (_expr_regex_quote_match 'value_double' '"')
+		$expr_regex += '|' + (_expr_regex_quote_match 'value_single' "'")
+		$expr_regex += '|' + (_expr_regex_quote_match 'value_backtick' '`')
+		$expr_regex += '|(?<value_simple>[^"\n#]+)|(?<value_none>\s*\n))|(?<comment>\#[^\n]*)|(?<key_only>[^\n\s#]+)|(?<whitespace>\s+|\n+|$)'
+		[System.Text.RegularExpressions.Regex]$expr_regex = [System.Text.RegularExpressions.Regex]::new($expr_regex, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 		function _parse_matches([string] $file_content) {
-
 			# match the regex and convert the pattern to a array of key = value_multi | value_single
 			$match_collection = $expr_regex.Matches($file_content)
 			# validate that the entire file was matched
@@ -574,80 +614,60 @@ function Import-Env {
 '@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 		function _interpret_match([System.Text.RegularExpressions.Match] $match) {
-			function _trim_newline([string] $value) {
-					<#
-					Trim the first and last newline character from a string.
-				#>
-					if ($value.EndsWith("`n")) {
-						$value = $value.Substring(0, $value.Length - 1)
-					}
-					elseif ($value.EndsWith("`r`n")) {
-						$value = $value.Substring(0, $value.Length - 2)
-					}
-					elseif ($value.EndsWith("`r")) {
-						$value = $value.Substring(0, $value.Length - 1)
-					}
-					if ($value.StartsWith("`n")) {
-						$value = $value.Substring(1)
-					}
-					elseif ($value.StartsWith("`r`n")) {
-						$value = $value.Substring(2)
-					}
-					elseif ($value.StartsWith("`r")) {
-						$value = $value.Substring(1)
-					}
-					return $value
-				}
-				function _interpret_match_core([string] $key, [string] $value, [ImportEnvValueType] $value_type) {
-					# expand environment variables
-					$value = _expand_env_vars $value $value_type
-					# unescape the value
-					$value = _unescape $value $value_type
-					# return the key and value
-					return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, $value)
-				}
-				$match_span = "$($match.Index)..$($match.Index + $match.Length - 1)"
+			function _interpret_match_core([string] $key, [string] $value, [ImportEnvValueType] $value_type) {
+				# expand environment variables
+				$value = _expand_env_vars $value $value_type
+				# unescape the value
+				$value = _unescape $value $value_type
+				# return the key and value
+				return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, $value)
+			}
+			$match_span = "$($match.Index)..$($match.Index + $match.Length - 1)"
 
-				$key = $match.Groups["key_only"].Value
-				if ($key) {
-					Write-Warning "Invalid variable format: Missing '=' sign after key '$key' at $match_span. Ignoring variable."
-					return
-				}
+			$key = $match.Groups["key_only"].Value
+			if ($key) {
+				Write-Warning "Invalid variable format: Missing '=' sign after key '$key' at $match_span. Ignoring variable."
+				return
+			}
 
-				$key = $match.Groups["key"].Value.Trim()
-				if ($key.Length -eq 0) {
-					Write-Warning "Invalid variable format: Hidden environment variables are not allowed: '=HIDDEN=VALUE'. Ignoring variable."
-					return
-				}
-				# validate the key against [a-zA-Z_]+[a-zA-Z0-9_]*
-				if ($key -notmatch $key_regex) {
-					Write-Warning "Invalid variable format: Invalid key '$key' at $match_span. Ignoring variable."
-					return
-				}
+			$key = $match.Groups["key"].Value.Trim()
+			if ($key.Length -eq 0) {
+				Write-Warning "Invalid variable format: Hidden environment variables are not allowed: '=HIDDEN=VALUE'. Ignoring variable."
+				return
+			}
+			# validate the key against [a-zA-Z_]+[a-zA-Z0-9_]*
+			if ($key -notmatch $key_regex) {
+				Write-Warning "Invalid variable format: Invalid key '$key' at $match_span. Ignoring variable."
+				return
+			}
 
-				$value = $match.Groups["value_simple"].Value.Trim()
-				if ($value) {
-					# ensure the value does not start with ", because this is a missing terminating "
-					if ($value.Contains('"') -or $value.Contains("'")) {
-						Write-Warning "Invalid variable format: Quotation disallowed in simple expressions at $match_span. Using the value as-is."
-					}
-					$value = $value.TrimEnd()
-					return _interpret_match_core $key $value Simple
+			$value = $match.Groups['value_simple'].Value.Trim()
+			if ($value) {
+				# ensure the value does not start with ", because this is a missing terminating "
+				if ($value.Contains('"') -or $value.Contains("'")) {
+					Write-Warning "Invalid variable format: Quotation disallowed in simple expressions at $match_span. Using the value as-is."
 				}
+				$value = $value.TrimEnd()
+				return _interpret_match_core $key $value Simple
+			}
 
-				# handle interpolated values
-				$value = $match.Groups["value_inter"].Value
-				$value = if ($value) { $value } else { _trim_newline $match.Groups["value_inter_multi"].Value }
-				if ($value) {
-					return _interpret_match_core $key $value Interpolated
-				}
+			# handle interpolated values
+			$value = _expr_regex_get_value $match 'value_double'
+			if ($value) {
+				return _interpret_match_core $key $value Interpolated
+			}
 
-				#handle literal values
-				$value = $match.Groups["value_literal"].Value
-				$value = if ($value) { $value } else { _trim_newline $match.Groups["value_literal_multi"].Value }
-				if ($value) {
-					return _interpret_match_core $key $value Literal
-				}
+			#handle literal values
+			$value = _expr_regex_get_value $match 'value_single'
+			if ($value) {
+				return _interpret_match_core $key $value Literal
+			}
+
+			#handle backtick values
+			$value = _expr_regex_get_value $match 'value_backtick'
+			if ($value) {
+				return _interpret_match_core $key $value Backtick
+			}
 
 				return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, '')
 			}
