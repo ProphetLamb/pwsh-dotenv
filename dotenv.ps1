@@ -617,7 +617,7 @@ function Import-Env {
 
 			$key = $match.Groups["key_only"].Value
 			if ($key) {
-				Write-Warning "Invalid variable format: Missing '=' sign after key '$key' at $match_span. Ignoring variable."
+				Write-Warning "Invalid variable format: Invalid quotation preceds, or missing '=' sign after '$key' at $match_span. Ignoring variable."
 				return
 			}
 
