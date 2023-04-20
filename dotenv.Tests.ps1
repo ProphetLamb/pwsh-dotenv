@@ -6,7 +6,7 @@ BeforeAll {
 }
 
 Describe 'Import-Env' {
-  It 'should import the environment variables from the .env file' {
+  It 'imports the environment variables from the .env file' {
     $vars = Import-Env '.\.env'
     $vars | Should -Not -BeNullOrEmpty
     $vars.GetEnumerator() | Should -HaveCount 10
@@ -22,13 +22,13 @@ Describe 'Import-Env' {
     $keys | Should -Contain 'PRIVATE_KEY'
   }
 
-  It 'should expand all variables when Expand Force is set' {
+  It 'expands all variables when Expand Force is set' {
     $vars = Import-Env .\.env -Expand Force
     # check if the SingleQuoteNoVar variable was expanded from $Hello to ''
     $vars['SingleQuoteNoVar'] | Should -Be ''
   }
 
-  It 'should never expand variables when Expand Never is set' {
+  It 'never expands variables when Expand Never is set' {
     $vars = Import-Env .\.env -Expand Never
     # check if the SingleQuoteNoVar variable was expanded from $Hello to ''
     $vars['SingleQuoteNoVar'] | Should -Be '$Hello'
@@ -38,7 +38,7 @@ Describe 'Import-Env' {
 }
 
 Describe 'Export-Env' {
-  It 'should allow a roundtrip' {
+  It 'allows a roundtrip' {
     $varsRef = Import-Env '.\.env'
     $varsRef | Should -Not -BeNullOrEmpty
 
@@ -47,7 +47,7 @@ Describe 'Export-Env' {
     $vars | ConvertTo-Json | Should -Be ($varsRef | ConvertTo-Json)
   }
 
-  It 'should export process environment variables' {
+  It 'exports process environment variables' {
     # clear all relevant environment variables
     $vars = Import-Env '.\.env'
     $vars.GetEnumerator() | ForEach-Object { "`$env:$($_.Key)=''" | Invoke-Expression }
@@ -62,7 +62,7 @@ Describe 'Export-Env' {
 }
 
 Describe 'Use-Env' {
-  It 'should allow extraction of a environment variable' {
+  It 'allows extraction of a environment variable' {
     # ensure the value is $null
     $env:DoubleQuoteMultiline = $null
     # use env to store the value into $test
@@ -75,28 +75,33 @@ Describe 'Use-Env' {
 }
 
 Describe 'dotenv' {
-  It 'should allow probing values' {
+  It 'allows probing values' {
     [string[]]$query = dotenv -e .env -p DoubleQuoteMultiline, DoubleQuote
     $query.Count | Should -Be 2
     $query[0] | Should -Not -BeNullOrEmpty
     $query[1] | Should -Be "Line`"`nStringValue"
   }
 
-  It 'should not return when probing non existing values' {
+  It 'returns null when probing non existing values' {
     dotenv -e .env -p DoesNotExist | Should -BeNullOrEmpty
   }
 
-  It 'should execute commands' {
+  It 'executes commands' {
     $test = dotenv -e .env 'echo $env:DoubleQuote'
     $test | Should -Not -BeNullOrEmpty
     $test | Should -Be "Line`"`nStringValue"
   }
 
-  It 'should override .env values with .env.local configuration' {
+  It 'overrides .env values with .env.local configuration' {
     $test = dotenv -e .env 'echo $env:Hello'
     $test | Should -BeNullOrEmpty
     $test = dotenv -e .env -c '' 'echo $env:Hello'
     $test | Should -Not -BeNullOrEmpty
     $test | Should -Be "World"
+  }
+
+  It 'exports variables to the process if no command is provided' {
+    dotenv -e .env -c ''
+    $env:Hello | Should -Be "World"
   }
 }
