@@ -21,6 +21,8 @@ dotenv -p PRIVATE_KEY > cert.priv
 # execute myapp with the variables (highest wins):
 # System > .env > .env.development > .env.local > .env.development.local > HOST_URL=...
 dotenv -v HOST_URL=https://localhost:8081 -c development myapp.exe
+# when no command is provided exports them to the current process
+dotenv -v HOST_URL=https://localhost:8081 -c development
 ```
 
 For usage in scripting or development please refer to the functions described in [Usage](#usage).

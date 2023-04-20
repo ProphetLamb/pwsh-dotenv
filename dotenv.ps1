@@ -1047,5 +1047,8 @@ function dotenv {
 	if ($Command) {
 		# execute the command
 		$vars | Use-Env $Command
+	} else {
+		# load the variables into the process environment
+		$vars | Export-Env -Target Process
 	}
 }
