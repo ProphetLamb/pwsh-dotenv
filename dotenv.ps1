@@ -73,8 +73,12 @@ Param(
 # Dotenv for Powershell https://github.com/ProphetLamb/pwsh-dotenv/ dual licensed under the MIT & APACHE 2.0 License at your option
 # Copyright (c) 2019, Johannes Passing
 # Self installation https://github.com/jpassing/powershell-install-as-module/ licensed under the APACHE 2.0 License
+
 $_file_delimiter_regex = [System.Text.RegularExpressions.Regex]::new(@'
-(?si)##[#]+\s*?\n###=\s*(?<file_name>[^\n]*?)\n##[#]+\s*?\n?
+(?six)
+[#]{3,}\s*?\n
+[#]{3}=\s*(?<file_name>[^\n]*?)\n
+[#]{3,}\s*?\n?
 '@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 function Install-ScriptAsModule {
@@ -500,7 +504,12 @@ function Import-Env {
 		}
 
 		$expand_regex = [System.Text.RegularExpressions.Regex]::new(@'
-(?<!\\)\$(?:{(?<var_box>[^}]+)}|(?<var_literal>[a-zA-Z_]+[a-zA-Z0-9_]+))
+(?ix)
+(?<!\\)\$
+(?:
+	{(?<var_box>[^}]+)}
+	|(?<var_literal>[a-z_]+[a-z0-9_]*)
+)
 '@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 		function _expand_env_vars([string] $value, [ImportEnvValueType] $value_type) {
@@ -548,10 +557,23 @@ function Import-Env {
 			return $file_content
 		}
 
-		$expr_regex = @'
-(?si)(?<key>[^\n\s#]*?)\s*=\s*(?:(?<value_quoted>(?<value_quoted_quotes>["'`]+)(?:(?=(?<value_quoted_escape>\\?))\k<value_quoted_escape>.)*?\k<value_quoted_quotes>)|(?<value_simple>[^"\n#]+)|(?<value_none>\s*\n))|(?<comment>\#[^\n]*)|(?<key_only>[^\n\s#]+)|(?<whitespace>\s+|\n+|$)
-'@
-		[System.Text.RegularExpressions.Regex]$expr_regex = [System.Text.RegularExpressions.Regex]::new($expr_regex, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
+		$expr_regex = [System.Text.RegularExpressions.Regex]::new(@'
+(?six)
+(?<key>[^\n\s#]*?)\s*=\s*
+(?:
+	(?<value_quoted>
+		(?<value_quoted_quotes>["'`]+)
+		(?:(?=(?<value_quoted_escape>\\?))
+		\k<value_quoted_escape>.)*?
+		\k<value_quoted_quotes>
+	)
+	|(?<value_simple>[^"\n#]+)
+	|(?<value_none>\s*\n)
+)
+|(?<comment>\#[^\n]*)
+|(?<key_only>[^\n\s#]+)
+|(?<whitespace>\s+|\n+|$)
+'@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 		function _trim_once([string] $value, [string[]] $trim_sequences) {
 			<#
@@ -593,7 +615,8 @@ function Import-Env {
 		}
 
 		$key_regex = [System.Text.RegularExpressions.Regex]::new(@'
-^[a-zA-Z_]+[a-zA-Z0-9_]*$
+(?ix)
+^[a-z_]+[a-z0-9_]*$
 '@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 		function _interpret_match([System.Text.RegularExpressions.Match] $match) {
