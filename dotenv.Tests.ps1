@@ -35,6 +35,14 @@ Describe 'Import-Env' {
     # check if DoubleQuote was expanded from ${Multi}Value to Line\"\nStringValue
     $vars['DoubleQuote'] | Should -Be '${Multi}Value'
   }
+
+  It 'loads all system variables when specified' {
+    $vars = Import-Env -IncludeSystemVariables
+    $vars | Should -Not -BeNullOrEmpty
+    foreach ($key_value_pair in $vars.GetEnumerator()) {
+      $key_value_pair.Value | Should -Be ("`${env:$($key_value_pair.Key)}" | Invoke-Expression)
+    }
+  }
 }
 
 Describe 'Export-Env' {
@@ -56,7 +64,7 @@ Describe 'Export-Env' {
     # get the exported variables by the keys in vars and verify they are have the same value
     $vars.GetEnumerator() | ForEach-Object {
       $value = if ($_.Value) { $_.Value } else { $null }
-      $value | Should -Be ("`$env:$($_.Key)" | Invoke-Expression)
+      $value | Should -Be ("`${env:$($_.Key)}" | Invoke-Expression)
     }
   }
 }
@@ -101,6 +109,7 @@ Describe 'dotenv' {
   }
 
   It 'exports variables to the process if no command is provided' {
+    $env:Hello = $null
     dotenv -e .env -c ''
     $env:Hello | Should -Be "World"
   }
