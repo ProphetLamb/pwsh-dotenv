@@ -548,50 +548,33 @@ function Import-Env {
 			return $file_content
 		}
 
-		function _expr_regex_quote_match([string] $name, [string] $quote) {
-			$tripple_quote = $quote + $quote + $quote
-			"(?:$tripple_quote(?<$($name)_multi>(.*(?=$tripple_quote)))$tripple_quote)|(?:$quote(?<$($name)>(?:[^\\$quote]|\\.)*?)$quote)"
-		}
-		function _expr_regex_get_value([System.Text.RegularExpressions.Match] $match, [string] $name) {
-			function _trim_newline([string] $value) {
-				<#
-				Trim the first and last newline character from a string.
-				#>
-				if ($value.EndsWith("`n")) {
-					$value = $value.Substring(0, $value.Length - 1)
-				}
-				elseif ($value.EndsWith("`r`n")) {
-					$value = $value.Substring(0, $value.Length - 2)
-				}
-				elseif ($value.EndsWith("`r")) {
-					$value = $value.Substring(0, $value.Length - 1)
-				}
-				if ($value.StartsWith("`n")) {
-					$value = $value.Substring(1)
-				}
-				elseif ($value.StartsWith("`r`n")) {
-					$value = $value.Substring(2)
-				}
-				elseif ($value.StartsWith("`r")) {
-					$value = $value.Substring(1)
-				}
-				return $value
-			}
-			$value = $match.Groups[$name].Value
-			if ($value) {
-				return $value
-			}
-			$value = $match.Groups[$name + '_multi'].Value
-			if ($value) {
-				return _trim_newline $value
-			}
-			return $null
-		}
-		$expr_regex = '(?si)(?<key>[^\n\s#]*?)\s*=\s*(?:' + (_expr_regex_quote_match 'value_double' '"')
-		$expr_regex += '|' + (_expr_regex_quote_match 'value_single' "'")
-		$expr_regex += '|' + (_expr_regex_quote_match 'value_backtick' '`')
-		$expr_regex += '|(?<value_simple>[^"\n#]+)|(?<value_none>\s*\n))|(?<comment>\#[^\n]*)|(?<key_only>[^\n\s#]+)|(?<whitespace>\s+|\n+|$)'
+		$expr_regex = @'
+(?si)(?<key>[^\n\s#]*?)\s*=\s*(?:(?<value_quoted>(?<value_quoted_quotes>["'`]+)(?:(?=(?<value_quoted_escape>\\?))\k<value_quoted_escape>.)*?\k<value_quoted_quotes>)|(?<value_simple>[^"\n#]+)|(?<value_none>\s*\n))|(?<comment>\#[^\n]*)|(?<key_only>[^\n\s#]+)|(?<whitespace>\s+|\n+|$)
+'@
 		[System.Text.RegularExpressions.Regex]$expr_regex = [System.Text.RegularExpressions.Regex]::new($expr_regex, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
+
+		function _trim_once([string] $value, [string[]] $trim_sequences) {
+			<#
+			Trims one of the sequences once from start and end.
+			Requires the sequences to be sorted by length descending.
+			#>
+			$trimmed_start = $false
+			$trimmed_end = $false
+			foreach ($trim_sequence in $trim_sequences) {
+				if (-not $trimmed_start -and $value.StartsWith($trim_sequence)) {
+					$value = $value.Substring($trim_sequence.Length)
+					$trimmed_start = $true
+				}
+				if (-not $trimmed_end -and $value.EndsWith($trim_sequence)) {
+					$value = $value.Substring(0, $value.Length - $trim_sequence.Length)
+					$trimmed_end = $true
+				}
+				if ($trimmed_start -and $trimmed_end) {
+					break
+				}
+			}
+			return $value
+		}
 
 		function _parse_matches([string] $file_content) {
 			# match the regex and convert the pattern to a array of key = value_multi | value_single
@@ -614,6 +597,14 @@ function Import-Env {
 '@, [System.Text.RegularExpressions.RegexOptions]::Compiled + [System.Text.RegularExpressions.RegexOptions]::CultureInvariant + [System.Text.RegularExpressions.RegexOptions]::ExplicitCapture)
 
 		function _interpret_match([System.Text.RegularExpressions.Match] $match) {
+			function _value_type_from_quote([string] $quote) {
+				switch ($quote) {
+					'`' { return [ImportEnvValueType]::Literal }
+					"'" { return [ImportEnvValueType]::Literal }
+					'"' { return [ImportEnvValueType]::Interpolated }
+					default { throw "Invalid quote: $quote" }
+				}
+			}
 			function _interpret_match_core([string] $key, [string] $value, [ImportEnvValueType] $value_type) {
 				# expand environment variables
 				$value = _expand_env_vars $value $value_type
@@ -651,33 +642,27 @@ function Import-Env {
 				return _interpret_match_core $key $value Simple
 			}
 
-			# handle interpolated values
-			$value = _expr_regex_get_value $match 'value_double'
+			$value = $match.Groups['value_quoted'].Value.Trim()
 			if ($value) {
-				return _interpret_match_core $key $value Interpolated
+				# trim the quotes
+				$quotes = $match.Groups['value_quoted_quotes'].Value
+				$value_type = _value_type_from_quote $quotes[0]
+				$value = _trim_once $value @($quotes)
+				if ($quotes.Length -gt 1) {
+					# multi quote trim first and last newline
+					$value = _trim_once $value @("`r`n", "`r", "`n")
+				}
+				return _interpret_match_core $key $value $value_type
 			}
+			return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, '')
+		}
+		function _parse_file_content([string] $file_content) {
+			$match_collection = _parse_matches $file_content
 
-			#handle literal values
-			$value = _expr_regex_get_value $match 'value_single'
-			if ($value) {
-				return _interpret_match_core $key $value Literal
-			}
-
-			#handle backtick values
-			$value = _expr_regex_get_value $match 'value_backtick'
-			if ($value) {
-				return _interpret_match_core $key $value Backtick
-			}
-
-				return [System.Collections.Generic.KeyValuePair[string, string]]::new($key, '')
-			}
-			function _parse_file_content([string] $file_content) {
-				$match_collection = _parse_matches $file_content
-
-				$failure_count = 0
-				$match_collection | ForEach-Object {
-					$key_value_pair = _interpret_match $_
-					if (-not $key_value_pair) {
+			$failure_count = 0
+			$match_collection | ForEach-Object {
+				$key_value_pair = _interpret_match $_
+				if (-not $key_value_pair) {
 					$failure_count += 1
 				}
 				else {
@@ -1067,7 +1052,8 @@ function dotenv {
 	if ($Command) {
 		# execute the command
 		$vars | Use-Env $Command
-	} else {
+	}
+ else {
 		# load the variables into the process environment
 		$vars | Export-Env -Target Process
 	}
